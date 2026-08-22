@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { GameState, UserSession, INITIAL_TEAMS } from './types';
+import { GameState, UserSession, INITIAL_TEAMS, SoundType } from './types';
 import { socket } from './socket';
+import { soundEngine } from './soundEngine';
 import { LoginScreen } from './components/LoginScreen';
 import { ParticipantDashboard } from './components/ParticipantDashboard';
 import { AdminPanel } from './components/AdminPanel';
 import { BroadcastOverlay } from './components/BroadcastOverlay';
-import { Shield, Crown, Wifi, WifiOff, LogOut, ArrowLeftRight } from 'lucide-react';
+import { Shield, Crown, WifiOff, LogOut } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [session, setSession] = useState<UserSession | null>(() => {
@@ -61,15 +62,22 @@ export const App: React.FC = () => {
     function onStateUpdate(newState: GameState) {
       setGameState(newState);
     }
+    function onTriggerSound(data: { soundType: SoundType }) {
+      if (data?.soundType) {
+        soundEngine.playBySoundType(data.soundType);
+      }
+    }
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('state_update', onStateUpdate);
+    socket.on('trigger_sound', onTriggerSound);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('state_update', onStateUpdate);
+      socket.off('trigger_sound', onTriggerSound);
     };
   }, []);
 
@@ -91,7 +99,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // Check if there is an active broadcast that hasn't been locally dismissed yet
   const activeBroadcastToShow =
     gameState.activeBroadcast && gameState.activeBroadcast.id !== dismissedBroadcastId
       ? gameState.activeBroadcast

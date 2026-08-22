@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { RoleType } from '../types';
 import { soundEngine } from '../soundEngine';
-import { Shield, Skull, Eye, EyeOff, X, Sparkles } from 'lucide-react';
+import { Shield, Skull, EyeOff, X, Sparkles, Heart } from 'lucide-react';
 
 interface RoleSealModalProps {
   role: RoleType;
@@ -11,23 +11,33 @@ interface RoleSealModalProps {
 
 export const RoleSealModal: React.FC<RoleSealModalProps> = ({ role, teamName, onClose }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isBreaking, setIsBreaking] = useState(false);
 
   const handleBreakSeal = () => {
-    if (!isOpen) {
-      if (role === 'traitor') {
-        soundEngine.playGong();
-      } else {
-        soundEngine.playVictory();
-      }
+    if (!isOpen && !isBreaking) {
+      setIsBreaking(true);
+      // Play intense accelerating heartbeat before revealing
+      soundEngine.playHeartbeat(5);
+
+      setTimeout(() => {
+        setIsBreaking(false);
+        setIsOpen(true);
+        if (role === 'traitor') {
+          soundEngine.playKnife();
+        } else {
+          soundEngine.playVictory();
+        }
+      }, 1400);
+    } else {
+      setIsOpen(!isOpen);
     }
-    setIsOpen(!isOpen);
   };
 
   const isTraitor = role === 'traitor';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-[#d4af37]/30 bg-gradient-to-b from-[#1c1824] to-[#0d0c12] p-6 text-center shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-[#d4af37]/40 bg-gradient-to-b from-[#1e1927] to-[#0b0a10] p-6 text-center shadow-2xl">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -60,18 +70,19 @@ export const RoleSealModal: React.FC<RoleSealModalProps> = ({ role, teamName, on
             {/* Pulsing Wax Seal */}
             <button
               onClick={handleBreakSeal}
+              disabled={isBreaking}
               className="group relative flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95"
             >
-              <div className="w-24 h-24 rounded-full wax-seal flex items-center justify-center shadow-xl group-hover:scale-105 transition-all duration-300">
+              <div className={`w-24 h-24 rounded-full wax-seal flex items-center justify-center shadow-2xl transition-all duration-300 ${isBreaking ? 'scale-110 ring-4 ring-red-500 animate-ping' : 'group-hover:scale-105'}`}>
                 <span className="text-3xl filter drop-shadow">🗡️</span>
               </div>
               <div className="absolute -bottom-3 px-3 py-1 bg-[#2a070c] border border-[#c41e3a]/60 rounded-full text-[10px] font-bold text-[#f6db7e] tracking-wider uppercase shadow-md animate-pulse">
-                Bryd Seglet
+                {isBreaking ? 'Bryder Seglet...' : 'Bryd Seglet'}
               </div>
             </button>
 
             <p className="text-[11px] text-[#9e9585] mt-8">
-              Tryk på voksseglet for at afsløre din rolle
+              {isBreaking ? 'Hjertet banker...' : 'Tryk på voksseglet for at afsløre din rolle'}
             </p>
           </div>
         ) : (

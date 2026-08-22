@@ -28,8 +28,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         name: team.name
       });
     } else {
-      // Admin login validation (PIN default '1234' or empty for fast entry)
-      if (adminPin.trim() !== '1234' && adminPin.trim() !== '') {
+      // Secret Admin PIN validation: "2026"
+      if (adminPin.trim() !== '2026') {
         setPinError(true);
         soundEngine.playTick();
         return;
@@ -167,22 +167,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <div>
                   <label className="block text-xs font-bold text-[#c5bca8] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-[#d4af37]" />
-                    Vært-PIN (Kode: 1234)
+                    Hemmelig Vært-PIN
                   </label>
                   <input
                     type="password"
                     inputMode="numeric"
+                    maxLength={10}
                     value={adminPin}
                     onChange={(e) => {
                       setAdminPin(e.target.value);
                       setPinError(false);
                     }}
-                    placeholder="Indtast 1234"
-                    className="w-full p-3 rounded-xl bg-black/50 border border-white/10 text-xs text-white placeholder:text-[#9e9585]/50 focus:outline-none focus:border-[#d4af37]"
+                    placeholder="••••"
+                    className="w-full p-3 rounded-xl bg-black/50 border border-white/10 text-center tracking-[0.3em] text-sm text-white placeholder:text-[#9e9585]/40 focus:outline-none focus:border-[#d4af37]"
                   />
                   {pinError && (
-                    <p className="text-[11px] text-[#ff6b81] mt-1 font-semibold">
-                      Forkert PIN. Brug standardkoden: 1234
+                    <p className="text-[11px] text-[#ff6b81] mt-1 font-semibold text-center">
+                      Forkert PIN-kode. Adgang nægtet.
                     </p>
                   )}
                 </div>

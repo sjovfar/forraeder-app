@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { GameState, Team, RoleType, EliminationReason, SoundType } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { GameState, Team, RoleType, EliminationReason, SoundType, ChatMessage } from '../types';
 import { socket } from '../socket';
 import { soundEngine } from '../soundEngine';
 import QRCode from 'qrcode';
@@ -15,13 +15,13 @@ import {
   Sparkles,
   Volume2,
   Users,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
+  Eye,
   Send,
   Flame,
-  UserCheck,
-  Edit2
+  Zap,
+  Heart,
+  Bell,
+  Clock
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -31,13 +31,17 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) => {
   const [activeTab, setActiveTab] = useState<
-    'roles' | 'status' | 'broadcast' | 'vote' | 'murder' | 'partner' | 'qr'
+    'roles' | 'status' | 'broadcast' | 'vote' | 'murder' | 'spy' | 'soundboard' | 'partner' | 'qr'
   >('roles');
 
   // Broadcast state
   const [broadcastTitle, setBroadcastTitle] = useState('Besked fra Slottets Værter');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastSound, setBroadcastSound] = useState<SoundType>('bell');
+
+  // Spy chat state
+  const [spyMessageInput, setSpyMessageInput] = useState('');
+  const spyChatBottomRef = useRef<HTMLDivElement>(null);
 
   // Voting state
   const [voteTitle, setVoteTitle] = useState(`Rundbordssamling #${gameState.voteSession.roundNumber}`);
@@ -71,12 +75,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       });
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'spy') {
+      spyChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [gameState.traitorChat.length, activeTab]);
+
   // Quick broadcast templates
   const broadcastTemplates = [
     {
       title: 'Der er sket et mord!',
       message: 'Der er fundet et lig på slottet. Alle bedes samles i slyngelstuen omgående.',
-      sound: 'gong' as SoundType
+      sound: 'knife' as SoundType
     },
     {
       title: 'Rundbordssamling!',
@@ -84,15 +94,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       sound: 'bell' as SoundType
     },
     {
-      title: 'Slots-Udfordring!',
-      message: 'En ny udfordring venter i slotsgården. Mød op klar til dyst.',
-      sound: 'alarm' as SoundType
+      title: 'Torden over Slottet!',
+      message: 'Mørket falder på, og slottets porte lukkes. Forræderne vågner...',
+      sound: 'thunder' as SoundType
+    },
+    {
+      title: 'Hjertebanken før dommen!',
+      message: 'Rådets afgørelse er truffet. Hvem forlader slottet i vanære?',
+      sound: 'heartbeat' as SoundType
     },
     {
       title: 'Partnerbytte er udløst!',
       message: 'Partnerbyttet er aktiveret! Første hold på knappen vinder.',
       sound: 'victory' as SoundType
     }
+  ];
+
+  // Soundboard items
+  const soundboardButtons: Array<{ label: string; sound: SoundType; icon: string; desc: string }> = [
+    { label: 'Tordenbrag', sound: 'thunder', icon: '⚡', desc: 'Dyb buldrende lynnedslag' },
+    { label: 'Hjertebanken', sound: 'heartbeat', icon: '🩸', desc: 'Accelererende intens puls' },
+    { label: 'Knivstik & Hvin', sound: 'knife', icon: '🗡️', desc: 'Skærende klinge og gys' },
+    { label: 'Kirkeklokke', sound: 'bell', icon: '🔔', desc: 'Dyb gotisk slotsklokke' },
+    { label: 'Dødsgong', sound: 'gong', icon: '💥', desc: 'Tung dommedags-sub-bas' },
+    { label: 'Spøgelses-Drone', sound: 'drone', icon: '👻', desc: 'Uhyggelig dissonant stemning' },
+    { label: 'Slots-Alarm', sound: 'alarm', icon: '🚨', desc: 'Presserende slots-sirene' },
+    { label: 'Sejrsfanfare', sound: 'victory', icon: '🎺', desc: 'Kongelig triumf-akkord' },
   ];
 
   // Helper counters
@@ -135,6 +162,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
     });
 
     setBroadcastMessage('');
+  };
+
+  const handleTriggerSound = (sound: SoundType) => {
+    soundEngine.playBySoundType(sound);
+    socket.emit('admin:play_sound', { soundType: sound });
+  };
+
+  const handleSendSpyMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!spyMessageInput.trim()) return;
+
+    socket.emit('traitor:send_message', {
+      senderId: 'admin',
+      senderName: `👑 Vært (${adminName.split(' ')[0]})`,
+      text: spyMessageInput.trim()
+    });
+
+    setSpyMessageInput('');
   };
 
   const handleStartVote = () => {
@@ -200,7 +245,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
           className="px-3 py-1.5 rounded-lg bg-red-950/80 border border-red-800 text-red-300 text-[11px] font-bold hover:bg-red-900 transition-colors flex items-center gap-1 cursor-pointer"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          Nulstil Spil
+          Nulstil
         </button>
       </div>
 
@@ -219,6 +264,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </button>
 
         <button
+          onClick={() => setActiveTab('spy')}
+          className={`relative px-3 py-2 rounded-xl font-bold uppercase tracking-wider shrink-0 transition-all flex items-center gap-1.5 ${
+            activeTab === 'spy'
+              ? 'bg-[#8c1424] text-white shadow-md'
+              : 'bg-[#220d13] text-[#ff8095] border border-[#c41e3a]/40 hover:bg-[#2e090e]'
+          }`}
+        >
+          <Eye className="w-4 h-4 text-[#ff4d6d]" />
+          Forræder-Spion 👁️
+        </button>
+
+        <button
+          onClick={() => setActiveTab('soundboard')}
+          className={`px-3 py-2 rounded-xl font-bold uppercase tracking-wider shrink-0 transition-all flex items-center gap-1.5 ${
+            activeTab === 'soundboard'
+              ? 'bg-[#d4af37] text-black shadow-md'
+              : 'bg-[#181622] text-[#c5bca8] hover:bg-[#232030]'
+          }`}
+        >
+          <Volume2 className="w-4 h-4 text-[#f6db7e]" />
+          Lydpult 🎛️
+        </button>
+
+        <button
           onClick={() => setActiveTab('status')}
           className={`px-3 py-2 rounded-xl font-bold uppercase tracking-wider shrink-0 transition-all flex items-center gap-1.5 ${
             activeTab === 'status'
@@ -227,7 +296,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
           }`}
         >
           <Users className="w-4 h-4" />
-          Hold ({livingTeams.length} Levende)
+          Hold ({livingTeams.length})
         </button>
 
         <button
@@ -263,7 +332,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
           }`}
         >
           <Skull className="w-4 h-4" />
-          Mord-anmodning
+          Mord
           {pendingMurders.length > 0 && (
             <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
           )}
@@ -294,7 +363,146 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </button>
       </div>
 
-      {/* TAB 1: ROLES MANAGEMENT */}
+      {/* ========================================================= */}
+      {/* TAB: FORRÆDER-SPION (LIVE OVERVÅGNING AF FORRÆDER-CHAT)  */}
+      {/* ========================================================= */}
+      {activeTab === 'spy' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl border border-[#c41e3a]/60 bg-gradient-to-b from-[#2e090e] via-[#1a060a] to-[#0a0406] shadow-2xl crimson-glow">
+            <div className="flex items-center justify-between border-b border-[#c41e3a]/30 pb-3 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-[#520d17] border border-[#ff3855] text-[#ff8095]">
+                  <Eye className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black font-gothic text-white">
+                    Forræder-Spion (Live Overvågning)
+                  </h3>
+                  <p className="text-[10px] text-[#ff8095]">
+                    Du ser alt, hvad forræderne skriver og planlægger i realtid.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] text-[#9e9585] block">Aktive Forrædere:</span>
+                <span className="text-xs font-black text-[#f6db7e]">
+                  {gameState.teams.filter(t => t.role === 'traitor').map(t => t.players[0]).join(', ') || 'Ingen tildelt'}
+                </span>
+              </div>
+            </div>
+
+            {/* Traitor Live Chat Feed */}
+            <div className="h-[340px] overflow-y-auto space-y-2 p-3 rounded-xl bg-black/60 border border-red-950/60 text-xs">
+              {gameState.traitorChat.map((msg: ChatMessage) => {
+                const isHost = msg.senderId === 'admin';
+                const isSys = msg.isSystem;
+
+                if (isSys) {
+                  return (
+                    <div
+                      key={msg.id}
+                      className="p-2 rounded-lg bg-[#380a10]/80 border border-[#c41e3a]/40 text-center text-[11px] text-[#fce8e8] italic my-1"
+                    >
+                      {msg.text}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${isHost ? 'items-end' : 'items-start'}`}
+                  >
+                    <span className="text-[10px] text-[#9e9585] mb-0.5 px-1">
+                      {msg.senderName} • {new Date(msg.timestamp).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <div
+                      className={`p-2.5 rounded-2xl max-w-[85%] leading-relaxed ${
+                        isHost
+                          ? 'bg-gradient-to-r from-[#85661a] to-[#d4af37] text-black font-semibold rounded-br-none shadow-md'
+                          : 'bg-[#2a0e14] border border-[#ff3855]/30 text-[#fce8e8] rounded-bl-none'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={spyChatBottomRef} />
+            </div>
+
+            {/* Host inject message form */}
+            <form onSubmit={handleSendSpyMessage} className="mt-3 flex gap-2">
+              <input
+                type="text"
+                value={spyMessageInput}
+                onChange={(e) => setSpyMessageInput(e.target.value)}
+                placeholder="Skriv en besked til forrædernes chat som Vært..."
+                className="flex-1 p-2.5 rounded-xl bg-black/50 border border-red-900/50 text-xs text-white placeholder:text-[#9e9585]/60 focus:outline-none focus:border-[#ff3855]"
+              />
+              <button
+                type="submit"
+                disabled={!spyMessageInput.trim()}
+                className="px-4 py-2.5 rounded-xl btn-gold text-black text-xs font-black uppercase tracking-wider shrink-0 disabled:opacity-40"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB: LIVE LYDPULT (HOST SOUNDBOARD)                      */}
+      {/* ========================================================= */}
+      {activeTab === 'soundboard' && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl border border-[#d4af37]/40 bg-[#16131f] space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <div>
+                <h3 className="text-sm font-black font-gothic text-[#f6db7e] flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-[#d4af37]" />
+                  Værtens Live Lydpult
+                </h3>
+                <p className="text-[11px] text-[#9e9585]">
+                  Tryk på en knap for at afspille lydeffekten øjeblikkeligt på <strong>alle tilsluttede telefoner</strong> på slottet!
+                </p>
+              </div>
+            </div>
+
+            {/* Soundboard grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+              {soundboardButtons.map((btn) => (
+                <button
+                  key={btn.sound}
+                  onClick={() => handleTriggerSound(btn.sound)}
+                  className="p-3.5 rounded-xl border border-white/10 bg-gradient-to-b from-[#221d2d] to-[#121018] hover:border-[#d4af37] active:scale-95 transition-all text-left flex flex-col justify-between shadow-lg group cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl filter drop-shadow">{btn.icon}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/50 text-[#f6db7e] group-hover:bg-[#d4af37] group-hover:text-black transition-colors">
+                      AFSPIL 🔊
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs font-black text-white block">
+                      {btn.label}
+                    </span>
+                    <span className="text-[10px] text-[#9e9585] block mt-0.5">
+                      {btn.desc}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB: ROLES MANAGEMENT                                     */}
+      {/* ========================================================= */}
       {activeTab === 'roles' && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl border border-[#d4af37]/30 bg-[#15131d] flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -355,7 +563,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
       )}
 
-      {/* TAB 2: TEAMS STATUS (ALIVE / DEAD / REASONS) */}
+      {/* TAB: TEAMS STATUS */}
       {activeTab === 'status' && (
         <div className="space-y-3">
           <div className="p-3 rounded-xl bg-black/40 border border-white/10 text-xs text-[#c5bca8]">
@@ -425,10 +633,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
       )}
 
-      {/* TAB 3: BROADCAST SYSTEM */}
+      {/* TAB: BROADCAST */}
       {activeTab === 'broadcast' && (
         <div className="space-y-4">
-          {/* Quick Templates */}
           <div>
             <span className="text-xs font-bold text-[#f6db7e] uppercase tracking-wider block mb-2">
               Hurtige Slots-Skabeloner:
@@ -455,7 +662,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             </div>
           </div>
 
-          {/* Broadcast Form */}
           <form onSubmit={handleSendBroadcast} className="p-4 rounded-2xl border border-[#c41e3a]/40 bg-[#19090d] space-y-3">
             <h3 className="text-xs font-black uppercase tracking-wider text-[#ff8095] flex items-center gap-1.5">
               <Radio className="w-4 h-4 text-[#ff3855]" />
@@ -485,8 +691,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
 
             <div>
               <label className="block text-[11px] text-[#c5bca8] mb-1">Slots-Lydalarm:</label>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-xs">
-                {(['bell', 'gong', 'alarm', 'whisper', 'victory'] as SoundType[]).map((snd) => (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+                {(['knife', 'heartbeat', 'thunder', 'bell', 'gong', 'alarm', 'drone', 'victory'] as SoundType[]).map((snd) => (
                   <button
                     key={snd}
                     type="button"
@@ -500,7 +706,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                         : 'bg-black/40 border-white/10 text-[#c5bca8] hover:bg-black/60'
                     }`}
                   >
-                    {snd === 'bell' ? '🔔 Klokke' : snd === 'gong' ? '💥 Gong' : snd === 'alarm' ? '🚨 Alarm' : snd === 'whisper' ? '👻 Hvisken' : '🎺 Fanfare'}
+                    {snd === 'knife' ? '🗡️ Knivstik' : snd === 'heartbeat' ? '🩸 Hjerte' : snd === 'thunder' ? '⚡ Torden' : snd === 'bell' ? '🔔 Klokke' : snd === 'gong' ? '💥 Gong' : snd === 'drone' ? '👻 Drone' : snd === 'alarm' ? '🚨 Alarm' : '🎺 Fanfare'}
                   </button>
                 ))}
               </div>
@@ -530,7 +736,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
       )}
 
-      {/* TAB 4: VOTING CONTROLLER */}
+      {/* TAB: VOTING */}
       {activeTab === 'vote' && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl border border-[#d4af37]/30 bg-[#16141e] space-y-3">
@@ -561,7 +767,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             ) : (
               <div className="space-y-3">
                 <div className="p-3 rounded-xl bg-[#380a10] border border-[#c41e3a] text-xs text-red-200">
-                  🔴 Afstemning er i gang! Deltagerne afgiver stemmer på deres telefoner.
+                  🔴 Afstemning er i gang! Deltagerne ser det cirkulære rundbord og afgiver stemmer.
                 </div>
 
                 <div className="p-3 rounded-xl bg-black/40 border border-white/10 space-y-2 text-xs">
@@ -615,7 +821,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
       )}
 
-      {/* TAB 5: MURDER APPROVALS */}
+      {/* TAB: MURDER */}
       {activeTab === 'murder' && (
         <div className="space-y-3">
           <div className="p-3 rounded-xl bg-[#2e090e] border border-[#c41e3a]/40 text-xs text-[#ff8095]">
@@ -678,7 +884,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
       )}
 
-      {/* TAB 6: PARTNER SWAP CONTROLLER */}
+      {/* TAB: PARTNER SWAP */}
       {activeTab === 'partner' && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl border border-[#d4af37]/30 bg-[#16141e] space-y-4">
@@ -710,7 +916,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                       {gameState.partnerSwap.winnerTeamName}
                     </h4>
 
-                    {/* Execution Form */}
                     <form onSubmit={handleConfirmPartnerSwap} className="mt-4 pt-3 border-t border-[#d4af37]/30 space-y-3">
                       <span className="text-xs font-bold text-[#f6db7e] block">
                         Gennemfør Partnerbyttet:
@@ -791,7 +996,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
       )}
 
-      {/* TAB 7: MOBILE QR CODE */}
+      {/* TAB: MOBILE QR CODE */}
       {activeTab === 'qr' && (
         <div className="p-6 rounded-2xl border border-[#d4af37]/30 bg-[#16141e] text-center space-y-4">
           <div className="inline-block p-3 rounded-full bg-[#d4af37]/20 text-[#f6db7e] mb-1">
@@ -802,7 +1007,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             Scan & Åbn på Telefoner
           </h3>
           <p className="text-xs text-[#c5bca8] max-w-sm mx-auto">
-            Sørg for, at deltagernes telefoner er forbundet til samme WiFi-netværk på slottet, og scan QR-koden med mobilens kamera:
+            Scan QR-koden med mobilens kamera for at åbne appen direkte:
           </p>
 
           {qrDataUrl && (

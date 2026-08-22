@@ -1,5 +1,7 @@
-// Web Audio API Synthesizer for gothic castle reality game sound effects
-// 100% offline, zero asset download latency, reliable across iOS Safari and Android Chrome
+// Web Audio API Synthesizer for gothic castle horror reality game sound effects
+// 100% offline, zero asset download latency, highly optimized for mobile devices
+
+import { SoundType } from './types';
 
 class CastleSoundEngine {
   private ctx: AudioContext | null = null;
@@ -14,17 +16,218 @@ class CastleSoundEngine {
     }
   }
 
-  // Deep Gothic Cathedral Bell with authentic strike harmonics and long decay
+  // 1. Accelerating Heartbeat (Hjertebanken) - Intense physiological tension
+  public playHeartbeat(beats = 6) {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      let time = this.ctx.currentTime;
+      let interval = 0.8; // starts at 75 BPM and accelerates to 130 BPM
+
+      for (let b = 0; b < beats; b++) {
+        // First thump (Lub)
+        this.synthHeartThump(time, 58, 0.75, 0.12);
+        // Second thump (Dub) slightly quieter and higher
+        this.synthHeartThump(time + 0.14, 72, 0.6, 0.1);
+
+        time += interval;
+        interval = Math.max(0.42, interval * 0.9); // accelerate
+      }
+    } catch (e) {
+      console.warn('Heartbeat audio failed:', e);
+    }
+  }
+
+  private synthHeartThump(startTime: number, freq: number, volume: number, duration: number) {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, startTime);
+    osc.frequency.exponentialRampToValueAtTime(32, startTime + duration);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(140, startTime);
+    filter.frequency.exponentialRampToValueAtTime(50, startTime + duration);
+
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(volume, startTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  }
+
+  // 2. Murder Knife Slash & Blood Impact (Knivstik & Hvin)
+  public playKnife() {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+
+      // Metallic blade scrape
+      const metalOsc = this.ctx.createOscillator();
+      const metalGain = this.ctx.createGain();
+      metalOsc.type = 'sawtooth';
+      metalOsc.frequency.setValueAtTime(2400, now);
+      metalOsc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+
+      const metalFilter = this.ctx.createBiquadFilter();
+      metalFilter.type = 'bandpass';
+      metalFilter.frequency.setValueAtTime(2000, now);
+      metalFilter.Q.setValueAtTime(8, now);
+
+      metalGain.gain.setValueAtTime(0.6, now);
+      metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      metalOsc.connect(metalFilter);
+      metalFilter.connect(metalGain);
+      metalGain.connect(this.ctx.destination);
+
+      metalOsc.start(now);
+      metalOsc.stop(now + 0.25);
+
+      // Deep visceral impact (the stab)
+      const stabOsc = this.ctx.createOscillator();
+      const stabGain = this.ctx.createGain();
+      stabOsc.type = 'triangle';
+      stabOsc.frequency.setValueAtTime(110, now + 0.12);
+      stabOsc.frequency.exponentialRampToValueAtTime(35, now + 0.9);
+
+      stabGain.gain.setValueAtTime(0, now + 0.12);
+      stabGain.gain.linearRampToValueAtTime(0.8, now + 0.14);
+      stabGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+
+      stabOsc.connect(stabGain);
+      stabGain.connect(this.ctx.destination);
+
+      stabOsc.start(now + 0.12);
+      stabOsc.stop(now + 1.2);
+
+      // Spooky lingering whisper after murder
+      setTimeout(() => this.playWhisper(), 350);
+    } catch (e) {
+      console.warn('Knife audio failed:', e);
+    }
+  }
+
+  // 3. Castle Thunder Strike & Rumble (Tordenbrag)
+  public playThunder() {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const bufferSize = this.ctx.sampleRate * 2.5;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+
+      // Pink/Brown noise generator for realistic thunder
+      let lastOut = 0.0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        output[i] = (lastOut + (0.02 * white)) / 1.02;
+        lastOut = output[i];
+        output[i] *= 3.5;
+      }
+
+      const whiteNoise = this.ctx.createBufferSource();
+      whiteNoise.buffer = buffer;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600, now);
+      filter.frequency.exponentialRampToValueAtTime(80, now + 2.2);
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.9, now + 0.04);
+      gain.gain.setValueAtTime(0.7, now + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+
+      whiteNoise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      whiteNoise.start(now);
+      whiteNoise.stop(now + 2.5);
+
+      // Heavy sub rumble under the thunder
+      const subOsc = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(55, now);
+      subOsc.frequency.exponentialRampToValueAtTime(28, now + 2.0);
+
+      subGain.gain.setValueAtTime(0.8, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+
+      subOsc.connect(subGain);
+      subGain.connect(this.ctx.destination);
+
+      subOsc.start(now);
+      subOsc.stop(now + 2.2);
+    } catch (e) {
+      console.warn('Thunder audio failed:', e);
+    }
+  }
+
+  // 4. Dissonant Ghost / Horror Drone (Uhyggelig Kordrone)
+  public playHorrorDrone() {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      // Dissonant devil's tritone frequencies (D, G#, B, D#)
+      const freqs = [146.83, 207.65, 246.94, 311.13];
+
+      freqs.forEach((f, i) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = i % 2 === 0 ? 'sawtooth' : 'sine';
+        osc.frequency.setValueAtTime(f, now);
+        // Slight eerie vibrato
+        osc.frequency.linearRampToValueAtTime(f * (i % 2 === 0 ? 1.02 : 0.98), now + 1.8);
+        osc.frequency.linearRampToValueAtTime(f, now + 3.5);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(450, now);
+        filter.frequency.linearRampToValueAtTime(250, now + 3.0);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.25, now + 0.8);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.8);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 3.8);
+      });
+    } catch (e) {
+      console.warn('Drone audio failed:', e);
+    }
+  }
+
+  // 5. Deep Gothic Cathedral Bell with authentic strike harmonics
   public playBell() {
     try {
       this.initContext();
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
 
-      // Bell harmonics frequencies
-      const freqs = [150, 300, 450, 680, 1150, 1600];
-      const gains = [0.6, 0.4, 0.3, 0.2, 0.15, 0.08];
-      const decays = [4.5, 3.5, 2.8, 2.0, 1.2, 0.8];
+      const freqs = [145, 290, 435, 650, 1100, 1550];
+      const gains = [0.65, 0.45, 0.35, 0.22, 0.15, 0.08];
+      const decays = [4.8, 3.8, 3.0, 2.2, 1.4, 0.9];
 
       freqs.forEach((f, i) => {
         if (!this.ctx) return;
@@ -45,66 +248,62 @@ class CastleSoundEngine {
         osc.stop(now + decays[i]);
       });
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Bell audio failed:', e);
     }
   }
 
-  // Dark Sub-Bass Doom Gong
+  // 6. Dark Sub-Bass Doom Gong
   public playGong() {
     try {
       this.initContext();
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
 
-      // Low sub bass
       const subOsc = this.ctx.createOscillator();
       const subGain = this.ctx.createGain();
       subOsc.type = 'sawtooth';
       subOsc.frequency.setValueAtTime(65, now);
-      subOsc.frequency.exponentialRampToValueAtTime(38, now + 3.0);
+      subOsc.frequency.exponentialRampToValueAtTime(36, now + 3.2);
 
-      // Lowpass filter for dark thud
       const filter = this.ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(250, now);
-      filter.frequency.exponentialRampToValueAtTime(70, now + 3.0);
+      filter.frequency.setValueAtTime(260, now);
+      filter.frequency.exponentialRampToValueAtTime(65, now + 3.2);
 
-      subGain.gain.setValueAtTime(0.7, now);
-      subGain.gain.exponentialRampToValueAtTime(0.0001, now + 3.5);
+      subGain.gain.setValueAtTime(0.75, now);
+      subGain.gain.exponentialRampToValueAtTime(0.0001, now + 3.6);
 
       subOsc.connect(filter);
       filter.connect(subGain);
       subGain.connect(this.ctx.destination);
 
       subOsc.start(now);
-      subOsc.stop(now + 3.5);
+      subOsc.stop(now + 3.6);
 
-      // Metallic shimmer
       const metalOsc = this.ctx.createOscillator();
       const metalGain = this.ctx.createGain();
       metalOsc.type = 'triangle';
       metalOsc.frequency.setValueAtTime(210, now);
-      metalGain.gain.setValueAtTime(0.3, now);
-      metalGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+      metalGain.gain.setValueAtTime(0.35, now);
+      metalGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
 
       metalOsc.connect(metalGain);
       metalGain.connect(this.ctx.destination);
 
       metalOsc.start(now);
-      metalOsc.stop(now + 2.0);
+      metalOsc.stop(now + 2.2);
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Gong audio failed:', e);
     }
   }
 
-  // Urgent Castle Alarm / War Horn
+  // 7. Urgent Castle Alarm / War Horn
   public playAlarm() {
     try {
       this.initContext();
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
 
-      // Repeating 3-pulse dramatic brass horn
       for (let p = 0; p < 3; p++) {
         const pulseTime = now + p * 0.45;
         const osc1 = this.ctx.createOscillator();
@@ -116,7 +315,6 @@ class CastleSoundEngine {
         osc1.frequency.setValueAtTime(220, pulseTime);
         osc2.frequency.setValueAtTime(440, pulseTime);
 
-        // Lowpass to give warm brass feel
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(800, pulseTime);
@@ -137,11 +335,11 @@ class CastleSoundEngine {
         osc2.stop(pulseTime + 0.4);
       }
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Alarm audio failed:', e);
     }
   }
 
-  // Whisper / Eerie Murder Revelation
+  // 8. Eerie Whisper
   public playWhisper() {
     try {
       this.initContext();
@@ -156,7 +354,7 @@ class CastleSoundEngine {
       osc.frequency.linearRampToValueAtTime(110, now + 2.5);
 
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.3, now + 0.4);
+      gain.gain.linearRampToValueAtTime(0.35, now + 0.4);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 2.8);
 
       osc.connect(gain);
@@ -165,17 +363,17 @@ class CastleSoundEngine {
       osc.start(now);
       osc.stop(now + 2.8);
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Whisper audio failed:', e);
     }
   }
 
-  // Royal Golden Fanfare / Victory
+  // 9. Royal Victory Fanfare
   public playVictory() {
     try {
       this.initContext();
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
-      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99]; // C4, E4, G4, C5, E5, G5
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
 
       notes.forEach((freq, idx) => {
         if (!this.ctx) return;
@@ -198,11 +396,11 @@ class CastleSoundEngine {
         osc.stop(noteTime + duration);
       });
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Victory audio failed:', e);
     }
   }
 
-  // Ticking Tension (Grandfather Clock)
+  // 10. Clock Tick Tension
   public playTick() {
     try {
       this.initContext();
@@ -224,12 +422,24 @@ class CastleSoundEngine {
       osc.start(now);
       osc.stop(now + 0.035);
     } catch (e) {
-      console.warn('Audio play failed:', e);
+      console.warn('Tick audio failed:', e);
     }
   }
 
-  public playBySoundType(type: 'bell' | 'gong' | 'alarm' | 'whisper' | 'victory') {
+  public playBySoundType(type: SoundType) {
     switch (type) {
+      case 'heartbeat':
+        this.playHeartbeat(7);
+        break;
+      case 'knife':
+        this.playKnife();
+        break;
+      case 'thunder':
+        this.playThunder();
+        break;
+      case 'drone':
+        this.playHorrorDrone();
+        break;
       case 'bell':
         this.playBell();
         break;

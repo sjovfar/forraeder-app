@@ -15,7 +15,7 @@ export interface Team {
 
 export interface UserSession {
   type: 'team' | 'admin';
-  id: string; // teamId or 'admin-julius' / 'admin-karoline'
+  id: string;
   name: string;
 }
 
@@ -74,7 +74,16 @@ export interface PartnerSwapSession {
   };
 }
 
-export type SoundType = 'bell' | 'gong' | 'alarm' | 'whisper' | 'victory';
+export type SoundType = 
+  | 'bell' 
+  | 'gong' 
+  | 'alarm' 
+  | 'whisper' 
+  | 'victory' 
+  | 'heartbeat' 
+  | 'knife' 
+  | 'thunder' 
+  | 'drone';
 
 export interface BroadcastEvent {
   id: string;

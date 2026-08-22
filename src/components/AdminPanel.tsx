@@ -21,7 +21,9 @@ import {
   Zap,
   Heart,
   Bell,
-  Clock
+  Clock,
+  LogOut,
+  AlertOctagon
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -169,6 +171,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
     socket.emit('admin:play_sound', { soundType: sound });
   };
 
+  const handleForceLogoutAll = () => {
+    if (confirm('🚨 VIGTIGT: Dette vil TVINGE LOGOUT PÅ ALLE ENHEDER (både deltagere og værter) med det samme! Hvis nogen deltagere er kommet ind på værtslogin, bliver de smidt ud til login-skærmen.\n\nVil du fortsætte?')) {
+      soundEngine.playGong();
+      socket.emit('admin:force_logout_all');
+    }
+  };
+
   const handleSendSpyMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!spyMessageInput.trim()) return;
@@ -225,7 +234,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
   return (
     <div className="w-full space-y-4 pb-20">
       {/* Admin Top Banner */}
-      <div className="rounded-2xl border-2 border-[#d4af37] bg-gradient-to-r from-[#2a2010] via-[#1a140d] to-[#2a2010] p-4 shadow-2xl gold-glow flex items-center justify-between">
+      <div className="rounded-2xl border-2 border-[#d4af37] bg-gradient-to-r from-[#2a2010] via-[#1a140d] to-[#2a2010] p-4 shadow-2xl gold-glow flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-[#d4af37] text-black shadow-md">
             <Crown className="w-6 h-6" />
@@ -240,13 +249,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
           </div>
         </div>
 
-        <button
-          onClick={handleResetGame}
-          className="px-3 py-1.5 rounded-lg bg-red-950/80 border border-red-800 text-red-300 text-[11px] font-bold hover:bg-red-900 transition-colors flex items-center gap-1 cursor-pointer"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Nulstil
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Force Logout All Button */}
+          <button
+            onClick={handleForceLogoutAll}
+            className="px-3 py-1.5 rounded-lg bg-[#520d17] border border-[#ff3855] text-[#ff8095] hover:bg-[#8c1424] text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+            title="Tving logout på alle telefoner og computere"
+          >
+            <AlertOctagon className="w-3.5 h-3.5 text-[#ff4d6d]" />
+            Log Alle Ud 🚨
+          </button>
+
+          {/* Reset Game Button */}
+          <button
+            onClick={handleResetGame}
+            className="px-3 py-1.5 rounded-lg bg-red-950/80 border border-red-800 text-red-300 text-[11px] font-bold hover:bg-red-900 transition-colors flex items-center gap-1 cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Nulstil
+          </button>
+        </div>
       </div>
 
       {/* Navigation Tabs Bar */}
@@ -500,9 +522,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* TAB: ROLES MANAGEMENT                                     */}
-      {/* ========================================================= */}
+      {/* TAB: ROLES */}
       {activeTab === 'roles' && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl border border-[#d4af37]/30 bg-[#15131d] flex flex-col sm:flex-row items-center justify-between gap-3">

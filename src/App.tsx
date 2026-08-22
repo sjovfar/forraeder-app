@@ -6,7 +6,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { ParticipantDashboard } from './components/ParticipantDashboard';
 import { AdminPanel } from './components/AdminPanel';
 import { BroadcastOverlay } from './components/BroadcastOverlay';
-import { Shield, Crown, WifiOff, LogOut } from 'lucide-react';
+import { Shield, Crown, WifiOff, LogOut, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [session, setSession] = useState<UserSession | null>(() => {
@@ -51,6 +51,7 @@ export const App: React.FC = () => {
 
   const [isConnected, setIsConnected] = useState<boolean>(socket.connected);
   const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string | null>(null);
+  const [forceLogoutNotice, setForceLogoutNotice] = useState<string | null>(null);
 
   useEffect(() => {
     function onConnect() {
@@ -67,21 +68,32 @@ export const App: React.FC = () => {
         soundEngine.playBySoundType(data.soundType);
       }
     }
+    function onForceLogout(data: { message?: string }) {
+      try {
+        localStorage.removeItem('forraeder_session');
+      } catch {}
+      setSession(null);
+      setForceLogoutNotice(data?.message || 'Slottets Værter har nulstillet alle login-sessioner.');
+      soundEngine.playGong();
+    }
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('state_update', onStateUpdate);
     socket.on('trigger_sound', onTriggerSound);
+    socket.on('force_logout', onForceLogout);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('state_update', onStateUpdate);
       socket.off('trigger_sound', onTriggerSound);
+      socket.off('force_logout', onForceLogout);
     };
   }, []);
 
   const handleLogin = (newSession: UserSession) => {
+    setForceLogoutNotice(null);
     setSession(newSession);
     try {
       localStorage.setItem('forraeder_session', JSON.stringify(newSession));
@@ -111,6 +123,22 @@ export const App: React.FC = () => {
         <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 px-3 py-1 rounded-full bg-red-950/90 border border-red-600 text-red-200 text-[10px] font-bold flex items-center gap-1.5 shadow-xl animate-pulse">
           <WifiOff className="w-3 h-3" />
           <span>Genforbinder til Slottet...</span>
+        </div>
+      )}
+
+      {/* Force Logout Notification Banner on Login Screen */}
+      {forceLogoutNotice && !session && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-md p-3.5 rounded-2xl bg-gradient-to-r from-[#380a10] via-[#520d17] to-[#380a10] border-2 border-[#ff3855] text-white shadow-2xl text-xs flex items-center justify-between gap-2 animate-bounce">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-[#ff8095] shrink-0" />
+            <span>{forceLogoutNotice}</span>
+          </div>
+          <button
+            onClick={() => setForceLogoutNotice(null)}
+            className="text-[10px] uppercase font-bold text-[#f6db7e] hover:underline shrink-0"
+          >
+            Luk
+          </button>
         </div>
       )}
 

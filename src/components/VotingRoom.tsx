@@ -22,6 +22,14 @@ interface VotingRoomProps {
   isAdmin: boolean;
 }
 
+// Helper to extract clean first names (e.g. "Nicolai & Tobias")
+function getTeamFirstNames(team: Team): string {
+  if (!team.players || team.players.length === 0) {
+    return team.name.split('/')[0].trim();
+  }
+  return team.players.map(p => p.trim().split(' ')[0]).join(' & ');
+}
+
 export const VotingRoom: React.FC<VotingRoomProps> = ({
   voteSession,
   teams,
@@ -69,11 +77,12 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
     ? teams.find(t => t.id === voteSession.eliminatedTeamId) 
     : null;
 
-  // 14 seat positions calculation for the circular roundtable (SVG coordinates: center 250, 250, radius 180)
-  const centerX = 250;
-  const centerY = 250;
-  const tableRadius = 135;
-  const seatRadius = 188;
+  // 14 seat positions calculation for the circular roundtable (SVG dimensions: 580 x 580)
+  const centerX = 290;
+  const centerY = 290;
+  const tableRadius = 145;
+  const seatRadius = 205;
+  const labelRadius = 245;
   const numSeats = teams.length;
 
   const seatCoordinates = teams.map((team, idx) => {
@@ -83,6 +92,10 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
     const y = centerY + seatRadius * Math.sin(angle);
     const tableEdgeX = centerX + tableRadius * Math.cos(angle);
     const tableEdgeY = centerY + tableRadius * Math.sin(angle);
+    const labelX = centerX + labelRadius * Math.cos(angle);
+    const labelY = centerY + labelRadius * Math.sin(angle);
+
+    const firstNames = getTeamFirstNames(team);
 
     return {
       team,
@@ -91,7 +104,10 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
       y,
       tableEdgeX,
       tableEdgeY,
-      angle
+      labelX,
+      labelY,
+      angle,
+      firstNames
     };
   });
 
@@ -172,14 +188,14 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
       {/* 🏰 VIEW 1: CIRCULAR ROUNDTABLE (RIDDERSALENS RUNDBORD)    */}
       {/* ========================================================== */}
       {viewMode === 'table' && (
-        <div className="rounded-3xl border border-[#d4af37]/30 bg-gradient-to-b from-[#181322] via-[#0e0c15] to-[#07060a] p-2 sm:p-4 shadow-2xl relative overflow-hidden">
+        <div className="rounded-3xl border border-[#d4af37]/30 bg-gradient-to-b from-[#181322] via-[#0e0c15] to-[#07060a] p-1 sm:p-3 shadow-2xl relative overflow-hidden">
           {/* Ambient castle glow */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.08)_0%,transparent_70%)] pointer-events-none" />
 
           {/* SVG Circular Stage */}
-          <div className="relative w-full max-w-[460px] mx-auto aspect-square">
+          <div className="relative w-full max-w-[520px] mx-auto aspect-square">
             <svg
-              viewBox="0 0 500 500"
+              viewBox="0 0 580 580"
               className="w-full h-full select-none"
             >
               <defs>
@@ -252,7 +268,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
               <circle
                 cx={centerX}
                 cy={centerY}
-                r="45"
+                r="46"
                 fill="url(#firePit)"
                 stroke="#ff3855"
                 strokeWidth="2"
@@ -307,7 +323,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
 
                 return (
                   <g key={`${vote.voterTeamId}-${vote.targetTeamId}`}>
-                    {/* Beam glow */}
+                    {/* Beam line */}
                     <line
                       x1={voterSeat.tableEdgeX}
                       y1={voterSeat.tableEdgeY}
@@ -324,21 +340,20 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
               })}
 
               {/* ====================================================== */}
-              {/* 14 SEATS AROUND THE ROUNDTABLE                         */}
+              {/* 14 SEATS AROUND THE ROUNDTABLE WITH NAMES & NUMBERS    */}
               {/* ====================================================== */}
-              {seatCoordinates.map(({ team, idx, x, y }) => {
+              {seatCoordinates.map(({ team, idx, x, y, labelX, labelY, firstNames }) => {
                 const count = voteCounts[team.id] || 0;
                 const isSelected = myVote?.targetTeamId === team.id;
                 const isMe = currentTeam && team.id === currentTeam.id;
                 const isInspected = inspectSeatId === team.id;
 
-                // Seat dimensions
-                const seatR = isMe ? 22 : 18;
+                const seatR = isMe ? 21 : 18;
 
                 return (
                   <g
                     key={team.id}
-                    className="cursor-pointer transition-transform duration-200 hover:scale-110"
+                    className="cursor-pointer transition-transform duration-200"
                     onClick={() => {
                       setInspectSeatId(team.id);
                       if (voteSession.isActive && currentTeam && currentTeam.isAlive && !isMe) {
@@ -390,7 +405,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                       className="filter drop-shadow-md"
                     />
 
-                    {/* Seat Label (Team Number or Icon) */}
+                    {/* Seat Number */}
                     <text
                       x={x}
                       y={y + 4}
@@ -404,15 +419,44 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                           ? '#ff6b81'
                           : '#e6dfd1'
                       }
-                      fontSize={isMe ? '12' : '10'}
+                      fontSize={isMe ? '11' : '10'}
                       fontWeight="900"
                     >
                       {!team.isAlive ? '☠️' : isMe ? 'DIG' : `${idx + 1}`}
                     </text>
 
+                    {/* Participant First Names Label outside Seat */}
+                    <text
+                      x={labelX}
+                      y={labelY + 3}
+                      textAnchor="middle"
+                      fill={
+                        !team.isAlive
+                          ? '#662226'
+                          : isMe
+                          ? '#f6db7e'
+                          : isSelected
+                          ? '#ff8095'
+                          : count > 0
+                          ? '#fce8e8'
+                          : '#a89f8d'
+                      }
+                      fontSize="8.5"
+                      fontWeight="800"
+                      className="tracking-tight"
+                      style={{
+                        paintOrder: 'stroke',
+                        stroke: '#08070b',
+                        strokeWidth: '2.5px',
+                        strokeLinejoin: 'round'
+                      }}
+                    >
+                      {firstNames}
+                    </text>
+
                     {/* Vote Count Badge on Seat (if targeted) */}
                     {count > 0 && (
-                      <g transform={`translate(${x + 10}, ${y - 12})`}>
+                      <g transform={`translate(${x + 11}, ${y - 12})`}>
                         <circle
                           cx="0"
                           cy="0"
@@ -440,8 +484,8 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
           </div>
 
           {/* Helper caption below table */}
-          <div className="mt-2 text-center text-[11px] text-[#9e9585]">
-            💡 <strong className="text-[#f6db7e]">Tip:</strong> Tryk direkte på en stol ved bordet for at pege på holdet eller se hvem der stemmer på dem!
+          <div className="mt-1 text-center text-[11px] text-[#9e9585]">
+            💡 <strong className="text-[#f6db7e]">Tip:</strong> Tryk direkte på en stol for at pege på holdet eller se hvem der stemmer på dem!
           </div>
         </div>
       )}

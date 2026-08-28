@@ -4,6 +4,7 @@ import { RoleSealModal } from './RoleSealModal';
 import { VotingRoom } from './VotingRoom';
 import { TraitorConclave } from './TraitorConclave';
 import { PartnerSwapModal } from './PartnerSwapModal';
+import { DetectiveNotesModal } from './DetectiveNotesModal';
 import {
   Shield,
   Skull,
@@ -15,7 +16,10 @@ import {
   Sparkles,
   Lock,
   Flame,
-  CheckCircle2
+  CheckCircle2,
+  BookOpen,
+  Coins,
+  ShieldCheck
 } from 'lucide-react';
 
 interface ParticipantDashboardProps {
@@ -31,11 +35,13 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'vote' | 'conclave' | 'swap'>('overview');
   const [showRoleModal, setShowRoleModal] = useState<boolean>(false);
+  const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
   const [overviewFilter, setOverviewFilter] = useState<'all' | 'alive' | 'dead'>('all');
 
   const currentTeam = gameState.teams.find(t => t.id === session.id) || null;
   const isTraitor = currentTeam?.role === 'traitor';
   const isAlive = currentTeam?.isAlive ?? true;
+  const hasShield = currentTeam?.hasShield ?? false;
 
   const livingTeams = gameState.teams.filter(t => t.isAlive);
   const deadTeams = gameState.teams.filter(t => !t.isAlive);
@@ -57,8 +63,40 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
         />
       )}
 
+      {/* Detective Notes Modal */}
+      {showNotesModal && currentTeam && (
+        <DetectiveNotesModal
+          teams={gameState.teams}
+          currentTeam={currentTeam}
+          onClose={() => setShowNotesModal(false)}
+        />
+      )}
+
       {/* Main Content Area */}
       <div className="w-full max-w-md mx-auto p-4 space-y-4 pt-safe">
+        {/* Treasury Prize Pool Bar */}
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-[#2a2010] via-[#1a140d] to-[#2a2010] border border-[#d4af37]/40 shadow-lg">
+          <div className="flex items-center gap-2">
+            <Coins className="w-5 h-5 text-[#f6db7e] animate-pulse" />
+            <div>
+              <span className="text-[9px] uppercase font-black tracking-widest text-[#d4af37] block">
+                Slottets Skatkammer
+              </span>
+              <span className="text-xs font-black text-white">
+                {gameState.silverBars} Sølvbarrer indsamlet
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowNotesModal(true)}
+            className="px-3 py-1.5 rounded-xl bg-black/50 border border-white/15 text-xs font-bold text-[#f6db7e] hover:border-[#d4af37] flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Noter 📝</span>
+          </button>
+        </div>
+
         {/* Top Status Header */}
         <div className="castle-card rounded-3xl p-4 border border-[#d4af37]/35 shadow-xl relative overflow-hidden">
           <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
@@ -85,7 +123,7 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
               <span
                 className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full ${
@@ -96,6 +134,14 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
               >
                 {isAlive ? '🟢 Levende' : '☠️ Elimineret'}
               </span>
+
+              {/* Shield Badge */}
+              {hasShield && isAlive && (
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#3d2e0a] border border-[#d4af37] text-[#f6db7e] flex items-center gap-1 shadow-md animate-pulse">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#f6db7e]" />
+                  <span>Skjold</span>
+                </span>
+              )}
             </div>
 
             {/* Secret role button */}
@@ -218,6 +264,11 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
                               DIG
                             </span>
                           )}
+                          {team.hasShield && team.isAlive && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#3d2e0a] text-[#f6db7e] border border-[#d4af37]/40">
+                              🛡️ Skjold
+                            </span>
+                          )}
                         </div>
                         <span className="text-[10px] text-[#9e9585] block truncate mt-0.5">
                           {team.name}
@@ -295,7 +346,7 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
         )}
       </div>
 
-      {/* Bottom Fixed Navigation Bar (Mobile First) */}
+      {/* Bottom Fixed Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0e0d14]/95 backdrop-blur-lg border-t border-[#d4af37]/25 px-2 py-2 pb-safe">
         <div className="max-w-md mx-auto flex items-center justify-around">
           <button

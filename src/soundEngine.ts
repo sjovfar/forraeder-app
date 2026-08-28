@@ -16,22 +16,19 @@ class CastleSoundEngine {
     }
   }
 
-  // 1. Accelerating Heartbeat (Hjertebanken) - Intense physiological tension
+  // 1. Accelerating Heartbeat (Hjertebanken)
   public playHeartbeat(beats = 6) {
     try {
       this.initContext();
       if (!this.ctx) return;
       let time = this.ctx.currentTime;
-      let interval = 0.8; // starts at 75 BPM and accelerates to 130 BPM
+      let interval = 0.8;
 
       for (let b = 0; b < beats; b++) {
-        // First thump (Lub)
         this.synthHeartThump(time, 58, 0.75, 0.12);
-        // Second thump (Dub) slightly quieter and higher
         this.synthHeartThump(time + 0.14, 72, 0.6, 0.1);
-
         time += interval;
-        interval = Math.max(0.42, interval * 0.9); // accelerate
+        interval = Math.max(0.42, interval * 0.9);
       }
     } catch (e) {
       console.warn('Heartbeat audio failed:', e);
@@ -64,14 +61,13 @@ class CastleSoundEngine {
     osc.stop(startTime + duration);
   }
 
-  // 2. Murder Knife Slash & Blood Impact (Knivstik & Hvin)
+  // 2. Murder Knife Slash & Blood Impact
   public playKnife() {
     try {
       this.initContext();
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
 
-      // Metallic blade scrape
       const metalOsc = this.ctx.createOscillator();
       const metalGain = this.ctx.createGain();
       metalOsc.type = 'sawtooth';
@@ -93,7 +89,6 @@ class CastleSoundEngine {
       metalOsc.start(now);
       metalOsc.stop(now + 0.25);
 
-      // Deep visceral impact (the stab)
       const stabOsc = this.ctx.createOscillator();
       const stabGain = this.ctx.createGain();
       stabOsc.type = 'triangle';
@@ -110,14 +105,13 @@ class CastleSoundEngine {
       stabOsc.start(now + 0.12);
       stabOsc.stop(now + 1.2);
 
-      // Spooky lingering whisper after murder
       setTimeout(() => this.playWhisper(), 350);
     } catch (e) {
       console.warn('Knife audio failed:', e);
     }
   }
 
-  // 3. Castle Thunder Strike & Rumble (Tordenbrag)
+  // 3. Castle Thunder Strike
   public playThunder() {
     try {
       this.initContext();
@@ -127,7 +121,6 @@ class CastleSoundEngine {
       const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const output = buffer.getChannelData(0);
 
-      // Pink/Brown noise generator for realistic thunder
       let lastOut = 0.0;
       for (let i = 0; i < bufferSize; i++) {
         const white = Math.random() * 2 - 1;
@@ -157,7 +150,6 @@ class CastleSoundEngine {
       whiteNoise.start(now);
       whiteNoise.stop(now + 2.5);
 
-      // Heavy sub rumble under the thunder
       const subOsc = this.ctx.createOscillator();
       const subGain = this.ctx.createGain();
       subOsc.type = 'sine';
@@ -177,13 +169,12 @@ class CastleSoundEngine {
     }
   }
 
-  // 4. Dissonant Ghost / Horror Drone (Uhyggelig Kordrone)
+  // 4. Dissonant Ghost / Horror Drone
   public playHorrorDrone() {
     try {
       this.initContext();
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
-      // Dissonant devil's tritone frequencies (D, G#, B, D#)
       const freqs = [146.83, 207.65, 246.94, 311.13];
 
       freqs.forEach((f, i) => {
@@ -193,7 +184,6 @@ class CastleSoundEngine {
 
         osc.type = i % 2 === 0 ? 'sawtooth' : 'sine';
         osc.frequency.setValueAtTime(f, now);
-        // Slight eerie vibrato
         osc.frequency.linearRampToValueAtTime(f * (i % 2 === 0 ? 1.02 : 0.98), now + 1.8);
         osc.frequency.linearRampToValueAtTime(f, now + 3.5);
 
@@ -218,7 +208,68 @@ class CastleSoundEngine {
     }
   }
 
-  // 5. Deep Gothic Cathedral Bell with authentic strike harmonics
+  // 5. Shield Ward Sound (Beskyttelse)
+  public playShield() {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+
+      // Heavy golden chime
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(1040, now + 0.15);
+      osc.frequency.exponentialRampToValueAtTime(260, now + 1.5);
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.7, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 1.5);
+    } catch (e) {
+      console.warn('Shield audio failed:', e);
+    }
+  }
+
+  // 6. Silver Bars Clink / Coins
+  public playCoins() {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const notes = [1400, 1800, 2200, 2600];
+
+      notes.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const time = now + idx * 0.07;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, time);
+
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(0.4, time + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(time);
+        osc.stop(time + 0.25);
+      });
+    } catch (e) {
+      console.warn('Coins audio failed:', e);
+    }
+  }
+
+  // 7. Deep Gothic Cathedral Bell
   public playBell() {
     try {
       this.initContext();
@@ -252,7 +303,7 @@ class CastleSoundEngine {
     }
   }
 
-  // 6. Dark Sub-Bass Doom Gong
+  // 8. Dark Sub-Bass Doom Gong
   public playGong() {
     try {
       this.initContext();
@@ -285,7 +336,7 @@ class CastleSoundEngine {
       metalOsc.type = 'triangle';
       metalOsc.frequency.setValueAtTime(210, now);
       metalGain.gain.setValueAtTime(0.35, now);
-      metalGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+      metalGain.exponentialRampToValueAtTime(0.001, now + 2.2);
 
       metalOsc.connect(metalGain);
       metalGain.connect(this.ctx.destination);
@@ -297,7 +348,7 @@ class CastleSoundEngine {
     }
   }
 
-  // 7. Urgent Castle Alarm / War Horn
+  // 9. Urgent Castle Alarm
   public playAlarm() {
     try {
       this.initContext();
@@ -339,7 +390,7 @@ class CastleSoundEngine {
     }
   }
 
-  // 8. Eerie Whisper
+  // 10. Eerie Whisper
   public playWhisper() {
     try {
       this.initContext();
@@ -367,7 +418,7 @@ class CastleSoundEngine {
     }
   }
 
-  // 9. Royal Victory Fanfare
+  // 11. Royal Victory Fanfare
   public playVictory() {
     try {
       this.initContext();
@@ -400,7 +451,7 @@ class CastleSoundEngine {
     }
   }
 
-  // 10. Clock Tick Tension
+  // 12. Clock Tick Tension
   public playTick() {
     try {
       this.initContext();
@@ -439,6 +490,12 @@ class CastleSoundEngine {
         break;
       case 'drone':
         this.playHorrorDrone();
+        break;
+      case 'shield':
+        this.playShield();
+        break;
+      case 'coins':
+        this.playCoins();
         break;
       case 'bell':
         this.playBell();

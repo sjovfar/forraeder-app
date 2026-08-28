@@ -8,6 +8,7 @@ export interface Team {
   players: string[];
   role: RoleType;
   isAlive: boolean;
+  hasShield: boolean; // Shield against traitor murder
   eliminatedAt?: number;
   eliminationReason?: EliminationReason;
   roleRevealed: boolean;
@@ -45,7 +46,25 @@ export interface MurderProposal {
   targetTeamName: string;
   notes?: string;
   timestamp: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'blocked_by_shield';
+}
+
+export interface RecruitmentSession {
+  isActive: boolean;
+  targetTeamId: string;
+  targetTeamName: string;
+  proposedByTeamName: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  timestamp: number;
+}
+
+export interface MorningRevealSession {
+  isActive: boolean;
+  murderedTeamId?: string;
+  murderedTeamName?: string;
+  revealedTeamIds: string[];
+  timestamp: number;
+  isConcluded: boolean;
 }
 
 export interface ChatMessage {
@@ -83,7 +102,9 @@ export type SoundType =
   | 'heartbeat' 
   | 'knife' 
   | 'thunder' 
-  | 'drone';
+  | 'drone'
+  | 'coins'
+  | 'shield';
 
 export interface BroadcastEvent {
   id: string;
@@ -96,8 +117,11 @@ export interface BroadcastEvent {
 
 export interface GameState {
   teams: Team[];
+  silverBars: number; // Treasury prize pool
   voteSession: VoteSession;
   partnerSwap: PartnerSwapSession;
+  recruitment: RecruitmentSession | null;
+  morningReveal: MorningRevealSession | null;
   murderProposals: MurderProposal[];
   traitorChat: ChatMessage[];
   activeBroadcast: BroadcastEvent | null;

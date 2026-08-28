@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Team, ChatMessage, MurderProposal } from '../types';
 import { socket } from '../socket';
 import { soundEngine } from '../soundEngine';
-import { Skull, Send, Flame, Clock, CheckCircle, XCircle, Plus } from 'lucide-react';
+import { Skull, Send, Flame, Clock, CheckCircle, XCircle, Plus, Mail, Shield } from 'lucide-react';
 
 interface TraitorConclaveProps {
   traitorChat: ChatMessage[];
@@ -23,6 +23,8 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
   const [targetTeamId, setTargetTeamId] = useState('');
   const [assassinationNote, setAssassinationNote] = useState('');
   const [showMurderModal, setShowMurderModal] = useState(false);
+  const [showRecruitModal, setShowRecruitModal] = useState(false);
+  const [recruitTargetId, setRecruitTargetId] = useState('');
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
@@ -79,10 +81,20 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
     setTimeout(() => setIsSubmittingProposal(false), 500);
   };
 
+  const handleProposeRecruitment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recruitTargetId) return;
+
+    soundEngine.playWhisper();
+    socket.emit('traitor:propose_recruitment', { targetTeamId: recruitTargetId });
+    setRecruitTargetId('');
+    setShowRecruitModal(false);
+  };
+
   return (
     <div className="w-full space-y-3">
       {/* Conclave Atmosphere Banner */}
-      <div className="rounded-3xl border border-[#c41e3a]/50 bg-gradient-to-b from-[#380a10] via-[#20060a] to-[#0d0406] p-4 shadow-2xl crimson-glow flex items-center justify-between">
+      <div className="rounded-3xl border border-[#c41e3a]/50 bg-gradient-to-b from-[#380a10] via-[#20060a] to-[#0d0406] p-4 shadow-2xl crimson-glow flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="p-2.5 rounded-2xl bg-[#520d17] border border-[#ff3855] text-[#ff6b81]">
             <Skull className="w-5 h-5 animate-pulse" />
@@ -97,13 +109,23 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => setShowMurderModal(true)}
-          className="px-3 py-2 rounded-xl btn-crimson text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
-        >
-          <Flame className="w-3.5 h-3.5 text-[#ff8095]" />
-          Vælg Mord
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowRecruitModal(true)}
+            className="px-3 py-2 rounded-xl bg-[#2a1d08] border border-[#d4af37]/60 text-xs font-black text-[#f6db7e] uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            Rekrutter 💌
+          </button>
+
+          <button
+            onClick={() => setShowMurderModal(true)}
+            className="px-3 py-2 rounded-xl btn-crimson text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+          >
+            <Flame className="w-3.5 h-3.5 text-[#ff8095]" />
+            Vælg Mord 🗡️
+          </button>
+        </div>
       </div>
 
       {/* Secret Chat & Action Feed */}
@@ -199,7 +221,7 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
                   <option value="">-- Vælg hold --</option>
                   {livingLoyals.map((team) => (
                     <option key={team.id} value={team.id}>
-                      {team.name}
+                      {team.name} {team.hasShield && '(🛡️ Har Skjold)'}
                     </option>
                   ))}
                 </select>
@@ -230,6 +252,67 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
                 >
                   <Skull className="w-4 h-4" />
                   Send Mord-anmodning
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Recruitment Modal Sheet */}
+      {showRecruitModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md p-5 rounded-3xl border-2 border-[#d4af37] bg-gradient-to-b from-[#2a1d08] to-[#120b02] shadow-2xl gold-glow animate-slide-up">
+            <div className="flex items-center justify-between border-b border-[#d4af37]/30 pb-2.5 mb-3">
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-[#f6db7e]" />
+                <h3 className="text-sm font-black font-gothic text-white">
+                  Send Rekrutterings-Brev 💌
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowRecruitModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-[#e6dfd1]/80 mb-3 leading-relaxed">
+              Vælg et loyalt hold. De modtager et hemmeligt tilbud på deres telefon om at slutte sig til forræderne.
+            </p>
+
+            <form onSubmit={handleProposeRecruitment} className="space-y-3">
+              <div>
+                <select
+                  value={recruitTargetId}
+                  onChange={(e) => setRecruitTargetId(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-black/50 border border-[#d4af37]/40 text-xs text-white"
+                >
+                  <option value="">-- Vælg loyalt hold der skal rekrutteres --</option>
+                  {livingLoyals.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRecruitModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-black/60 border border-white/15 text-xs text-[#c5bca8]"
+                >
+                  Annuller
+                </button>
+                <button
+                  type="submit"
+                  disabled={!recruitTargetId}
+                  className="flex-1 py-2.5 rounded-xl btn-gold text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40"
+                >
+                  <Mail className="w-4 h-4" />
+                  Send Rekruttering
                 </button>
               </div>
             </form>

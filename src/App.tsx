@@ -6,7 +6,9 @@ import { LoginScreen } from './components/LoginScreen';
 import { ParticipantDashboard } from './components/ParticipantDashboard';
 import { AdminPanel } from './components/AdminPanel';
 import { BroadcastOverlay } from './components/BroadcastOverlay';
-import { Shield, Crown, WifiOff, LogOut, AlertTriangle } from 'lucide-react';
+import { RecruitmentOverlay } from './components/RecruitmentOverlay';
+import { MorningRevealOverlay } from './components/MorningRevealOverlay';
+import { Shield, Crown, WifiOff, LogOut, AlertTriangle, Coins } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [session, setSession] = useState<UserSession | null>(() => {
@@ -25,8 +27,10 @@ export const App: React.FC = () => {
       players: t.players,
       role: 'unassigned',
       isAlive: true,
+      hasShield: false,
       roleRevealed: false
     })),
+    silverBars: 0,
     voteSession: {
       isActive: false,
       roundNumber: 1,
@@ -42,6 +46,8 @@ export const App: React.FC = () => {
       expiresAt: 0,
       isCompleted: false
     },
+    recruitment: null,
+    morningReveal: null,
     murderProposals: [],
     traitorChat: [],
     activeBroadcast: null,
@@ -51,6 +57,7 @@ export const App: React.FC = () => {
 
   const [isConnected, setIsConnected] = useState<boolean>(socket.connected);
   const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string | null>(null);
+  const [dismissedMorningRevealTimestamp, setDismissedMorningRevealTimestamp] = useState<number | null>(null);
   const [forceLogoutNotice, setForceLogoutNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,24 +104,32 @@ export const App: React.FC = () => {
     setSession(newSession);
     try {
       localStorage.setItem('forraeder_session', JSON.stringify(newSession));
-    } catch {
-      // Ignore localStorage error
-    }
+    } catch {}
   };
 
   const handleLogout = () => {
     setSession(null);
     try {
       localStorage.removeItem('forraeder_session');
-    } catch {
-      // Ignore
-    }
+    } catch {}
   };
 
   const activeBroadcastToShow =
     gameState.activeBroadcast && gameState.activeBroadcast.id !== dismissedBroadcastId
       ? gameState.activeBroadcast
       : null;
+
+  const showMorningReveal =
+    gameState.morningReveal &&
+    gameState.morningReveal.isActive &&
+    gameState.morningReveal.timestamp !== dismissedMorningRevealTimestamp;
+
+  const showRecruitmentModal =
+    session &&
+    session.type === 'team' &&
+    gameState.recruitment &&
+    gameState.recruitment.isActive &&
+    gameState.recruitment.targetTeamId === session.id;
 
   return (
     <div className="min-h-screen bg-[#0a090d] text-[#e6dfd1] font-sans antialiased selection:bg-[#c41e3a] selection:text-white">
@@ -150,6 +165,23 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* Secret Recruitment Overlay Modal */}
+      {showRecruitmentModal && (
+        <RecruitmentOverlay
+          recruitment={gameState.recruitment!}
+          teamId={session.id}
+        />
+      )}
+
+      {/* Morning Reveal Overlay Modal */}
+      {showMorningReveal && (
+        <MorningRevealOverlay
+          morningReveal={gameState.morningReveal!}
+          teams={gameState.teams}
+          onDismiss={() => setDismissedMorningRevealTimestamp(gameState.morningReveal!.timestamp)}
+        />
+      )}
+
       {/* Screen Router */}
       {!session ? (
         <LoginScreen onLogin={handleLogin} />
@@ -159,7 +191,7 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-2">
               <Crown className="w-4 h-4 text-[#d4af37]" />
               <span className="text-xs font-bold text-[#f6db7e]">
-                Logget ind som: {session.name}
+                Vært: {session.name}
               </span>
             </div>
             <button

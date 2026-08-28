@@ -25,7 +25,13 @@ import {
   LogOut,
   AlertOctagon,
   Gamepad2,
-  Sliders
+  Sliders,
+  Coins,
+  ShieldCheck,
+  Coffee,
+  Mail,
+  Plus,
+  Minus
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -34,7 +40,6 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) => {
-  // Streamlined 4 Master Hubs: 'live' | 'traitors' | 'sound' | 'setup'
   const [activeHub, setActiveHub] = useState<'live' | 'traitors' | 'sound' | 'setup'>('live');
 
   // Broadcast state
@@ -102,9 +107,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       sound: 'thunder' as SoundType
     },
     {
-      title: 'Partnerbytte er udløst!',
-      message: 'Partnerbyttet er aktiveret! Første hold på knappen vinder.',
-      sound: 'victory' as SoundType
+      title: 'Sølvbarrer Vundet!',
+      message: 'Deltagerne har gennemført slottets udfordring og øget præmieskatten!',
+      sound: 'coins' as SoundType
     }
   ];
 
@@ -116,8 +121,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
     { label: 'Kirkeklokke', sound: 'bell', icon: '🔔', desc: 'Gotisk slotsklokke' },
     { label: 'Dødsgong', sound: 'gong', icon: '💥', desc: 'Dommedags-sub-bas' },
     { label: 'Spøgelses-Drone', sound: 'drone', icon: '👻', desc: 'Dissonant gys' },
-    { label: 'Slots-Alarm', sound: 'alarm', icon: '🚨', desc: 'Presserende sirene' },
-    { label: 'Sejrsfanfare', sound: 'victory', icon: '🎺', desc: 'Kongelig triumf' },
+    { label: 'Sølvmønter', sound: 'coins', icon: '💰', desc: 'Klingende sølvskat' },
+    { label: 'Våbenskjold', sound: 'shield', icon: '🛡️', desc: 'Tung gylden klokkeklang' },
   ];
 
   const traitorsCount = gameState.teams.filter(t => t.role === 'traitor').length;
@@ -145,6 +150,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       isAlive: !team.isAlive,
       reason: !team.isAlive ? 'manual' : undefined
     });
+  };
+
+  const handleToggleShield = (teamId: string) => {
+    socket.emit('admin:toggle_shield', { teamId });
+  };
+
+  const handleUpdateSilver = (delta: number) => {
+    socket.emit('admin:update_silver', { delta });
   };
 
   const handleSendBroadcast = (e?: React.FormEvent) => {
@@ -220,6 +233,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
     setSwapFromDeadTeam('');
   };
 
+  const handleStartMorningReveal = () => {
+    socket.emit('admin:start_morning_reveal');
+  };
+
   const handleResetGame = () => {
     if (confirm('ADVARSEL: Dette nulstiller hele spillet, alle stemmer, chats og roller. Er du helt sikker?')) {
       socket.emit('admin:reset_game');
@@ -245,18 +262,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Treasury Quick Controller */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/60 border border-[#d4af37]/40 shadow-inner">
+            <Coins className="w-4 h-4 text-[#f6db7e]" />
+            <span className="text-xs font-black text-white">{gameState.silverBars}</span>
+            <div className="flex gap-1 ml-1">
+              <button
+                onClick={() => handleUpdateSilver(1)}
+                className="w-5 h-5 rounded bg-[#d4af37] text-black font-black text-[10px] flex items-center justify-center cursor-pointer hover:bg-yellow-300"
+                title="+1 Sølvbarre"
+              >
+                +
+              </button>
+              <button
+                onClick={() => handleUpdateSilver(-1)}
+                className="w-5 h-5 rounded bg-zinc-800 text-white font-black text-[10px] flex items-center justify-center cursor-pointer hover:bg-zinc-700"
+                title="-1 Sølvbarre"
+              >
+                -
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={handleForceLogoutAll}
-            className="px-3 py-2 rounded-xl bg-[#520d17] border border-[#ff3855] text-[#ff8095] hover:bg-[#8c1424] text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-[#520d17] border border-[#ff3855] text-[#ff8095] hover:bg-[#8c1424] text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-md active:scale-95 cursor-pointer"
             title="Tving logout på alle enheder"
           >
-            <AlertOctagon className="w-4 h-4 text-[#ff4d6d]" />
+            <AlertOctagon className="w-3.5 h-3.5 text-[#ff4d6d]" />
             Log Alle Ud 🚨
           </button>
         </div>
       </div>
 
-      {/* 4 Streamlined Master Hub Tabs */}
+      {/* 4 Master Hub Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <button
           onClick={() => setActiveHub('live')}
@@ -314,11 +353,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       </div>
 
       {/* ========================================================= */}
-      {/* 🎮 HUB 1: LIVE SPILSTYRING (RUNDBORD & STATUS)            */}
+      {/* 🎮 HUB 1: LIVE SPILSTYRING                                */}
       {/* ========================================================= */}
       {activeHub === 'live' && (
         <div className="space-y-4">
-          {/* Voting Quick Controller */}
+          {/* Quick Morning Reveal Trigger */}
+          <div className="p-4 rounded-3xl border border-[#d4af37]/35 bg-[#16141e] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
+                <Coffee className="w-4 h-4 text-[#d4af37]" />
+                Morgensamling (Hvem Overlevede Natten?)
+              </h3>
+              <p className="text-[10px] text-[#9e9585]">
+                Udsender en dramatisk ankomst-sekvens til alle telefoner om morgenen.
+              </p>
+            </div>
+
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleStartMorningReveal}
+                className="flex-1 sm:flex-none px-4 py-2.5 rounded-2xl btn-gold text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
+              >
+                Start Morgensamling ☕
+              </button>
+
+              {gameState.morningReveal?.isActive && (
+                <button
+                  onClick={() => socket.emit('admin:end_morning_reveal')}
+                  className="px-3 py-2.5 rounded-2xl bg-black/60 border border-white/20 text-xs font-bold text-[#c5bca8]"
+                >
+                  Luk
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Voting Controller */}
           <div className="p-4 rounded-3xl border border-[#d4af37]/35 bg-[#16141e] space-y-3 shadow-xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
@@ -458,11 +528,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             )}
           </div>
 
-          {/* Quick Team Status List (Alive / Dead) */}
+          {/* Quick Team Status List (Alive / Dead / Shield) */}
           <div className="p-4 rounded-3xl border border-white/10 bg-[#16141e] space-y-3">
             <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
               <Users className="w-4 h-4 text-[#f6db7e]" />
-              Holdstatus ({livingTeams.length} Levende / {deadTeams.length} Døde)
+              Holdstatus & Våbenskjold ({livingTeams.length} Levende / {deadTeams.length} Døde)
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -478,11 +548,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                       {team.name}
                     </span>
                     <span className="text-[10px] text-[#9e9585]">
-                      {team.role === 'traitor' ? '🗡️ Forræder' : '🛡️ Loyal'} {team.roleRevealed && '(Afsløret)'}
+                      {team.role === 'traitor' ? '🗡️ Forræder' : '🛡️ Loyal'} {team.hasShield && '• (🛡️ Skjold Aktivt)'}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Toggle Shield Button */}
+                    {team.isAlive && (
+                      <button
+                        onClick={() => handleToggleShield(team.id)}
+                        className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                          team.hasShield
+                            ? 'bg-[#d4af37] text-black shadow-md'
+                            : 'bg-black/50 text-[#9e9585] border border-white/10 hover:text-white'
+                        }`}
+                        title={team.hasShield ? 'Fjern Våbenskjold' : 'Tildel Våbenskjold'}
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                      </button>
+                    )}
+
                     <button
                       onClick={() => handleToggleAlive(team)}
                       className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition-colors cursor-pointer ${
@@ -500,10 +585,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       )}
 
       {/* ========================================================= */}
-      {/* 🗡️ HUB 2: FORRÆDERE & MORD (SPION, MORD & ROLLER)          */}
+      {/* 🗡️ HUB 2: FORRÆDERE & MORD                                 */}
       {/* ========================================================= */}
       {activeHub === 'traitors' && (
         <div className="space-y-4">
+          {/* Active Recruitment Status */}
+          {gameState.recruitment && gameState.recruitment.isActive && (
+            <div className="p-4 rounded-3xl border-2 border-[#d4af37] bg-[#2a1d08] space-y-1.5 shadow-xl animate-pulse">
+              <div className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-[#f6db7e]" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-[#f6db7e]">
+                  Aktiv Rekrutterings-Forespørgsel!
+                </h4>
+              </div>
+              <p className="text-xs text-white">
+                Forræderne har tilbudt en plads til: <strong>{gameState.recruitment.targetTeamName}</strong>.
+              </p>
+              <span className="text-[10px] text-[#e6dfd1]/70 block">
+                Afventer svar på deltagerens telefon...
+              </span>
+            </div>
+          )}
+
           {/* Role Assignments Section */}
           <div className="p-4 rounded-3xl border border-[#d4af37]/35 bg-[#15131d] space-y-3">
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
@@ -587,8 +690,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                       </button>
                     </div>
                   ) : (
-                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${prop.status === 'approved' ? 'bg-red-950 text-red-300' : 'bg-zinc-900 text-zinc-400'}`}>
-                      {prop.status === 'approved' ? 'Godkendt & Død' : 'Afvist'}
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${prop.status === 'approved' ? 'bg-red-950 text-red-300' : prop.status === 'blocked_by_shield' ? 'bg-yellow-950 text-yellow-300 border border-yellow-700' : 'bg-zinc-900 text-zinc-400'}`}>
+                      {prop.status === 'approved' ? 'Godkendt & Død' : prop.status === 'blocked_by_shield' ? '🛡️ Blokeret af Våbenskjold' : 'Afvist'}
                     </span>
                   )}
                 </div>
@@ -637,11 +740,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       )}
 
       {/* ========================================================= */}
-      {/* 📢 HUB 3: LYD & BROADCAST (LYDPULT & FULDSKÆRMBESKEDER)   */}
+      {/* 📢 HUB 3: LYD & BROADCAST                                 */}
       {/* ========================================================= */}
       {activeHub === 'sound' && (
         <div className="space-y-4">
-          {/* Live Soundboard */}
           <div className="p-4 rounded-3xl border border-[#d4af37]/35 bg-[#16131f] space-y-3 shadow-xl">
             <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
               <Volume2 className="w-4 h-4 text-[#d4af37]" />
@@ -668,7 +770,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             </div>
           </div>
 
-          {/* Fullscreen Broadcast Form */}
           <form onSubmit={handleSendBroadcast} className="p-4 rounded-3xl border border-[#c41e3a]/40 bg-[#19090d] space-y-3 shadow-xl">
             <h3 className="text-xs font-black uppercase tracking-wider text-[#ff8095] flex items-center gap-1.5">
               <Radio className="w-4 h-4 text-[#ff3855]" />
@@ -734,7 +835,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       )}
 
       {/* ========================================================= */}
-      {/* ⚙️ HUB 4: SLOTTETS SETUP (QR, LOGOUT & NULSTIL)           */}
+      {/* ⚙️ HUB 4: SLOTTETS SETUP                                  */}
       {/* ========================================================= */}
       {activeHub === 'setup' && (
         <div className="space-y-4">

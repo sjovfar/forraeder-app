@@ -8,11 +8,10 @@ import {
   Flame, 
   Skull, 
   ShieldAlert, 
-  Eye, 
-  RotateCw, 
-  ListFilter,
+  X, 
+  AlertTriangle,
   Sparkles,
-  HeartCrack
+  Trophy
 } from 'lucide-react';
 
 interface VotingRoomProps {
@@ -37,16 +36,17 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
   isAdmin
 }) => {
   const [viewMode, setViewMode] = useState<'table' | 'list'>('table');
-  const [selectedTargetId, setSelectedTargetId] = useState<string>('');
-  const [inspectSeatId, setInspectSeatId] = useState<string | null>(null);
+  const [confirmTargetTeam, setConfirmTargetTeam] = useState<Team | null>(null);
 
   const livingTeams = teams.filter(t => t.isAlive);
   const totalVotesCast = Object.keys(voteSession.votes || {}).length;
   const myVote = currentTeam ? voteSession.votes?.[currentTeam.id] : null;
 
-  // Calculate votes counts per team
+  // Calculate votes counts per team and find leader
   const voteCounts: Record<string, number> = {};
   const votersForTeam: Record<string, string[]> = {};
+  let highestVoteCount = 0;
+  let leaderTeamId: string | null = null;
 
   Object.values(voteSession.votes || {}).forEach((v: VoteRecord) => {
     voteCounts[v.targetTeamId] = (voteCounts[v.targetTeamId] || 0) + 1;
@@ -54,23 +54,41 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
       votersForTeam[v.targetTeamId] = [];
     }
     votersForTeam[v.targetTeamId].push(v.voterTeamName);
+
+    if (voteCounts[v.targetTeamId] > highestVoteCount) {
+      highestVoteCount = voteCounts[v.targetTeamId];
+      leaderTeamId = v.targetTeamId;
+    }
   });
 
-  const handleCastVote = (targetId: string) => {
+  const handleOpenConfirm = (team: Team) => {
     if (!currentTeam || !currentTeam.isAlive || !voteSession.isActive) return;
-    if (targetId === currentTeam.id) return; // Cannot vote for yourself
+    if (team.id === currentTeam.id) return; // Cannot vote for yourself
+    if (!team.isAlive) return;
 
-    const target = teams.find(t => t.id === targetId);
-    if (!target || !target.isAlive) return;
+    soundEngine.playTick();
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(30); } catch {}
+    }
+    setConfirmTargetTeam(team);
+  };
+
+  const handleExecuteVote = () => {
+    if (!confirmTargetTeam || !currentTeam) return;
 
     soundEngine.playHeartbeat(3);
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate([40, 60, 80]); } catch {}
+    }
+
     socket.emit('vote:cast', {
       voterTeamId: currentTeam.id,
       voterTeamName: currentTeam.name,
-      targetTeamId: target.id,
-      targetTeamName: target.name
+      targetTeamId: confirmTargetTeam.id,
+      targetTeamName: confirmTargetTeam.name
     });
-    setSelectedTargetId(target.id);
+
+    setConfirmTargetTeam(null);
   };
 
   const eliminatedTeam = voteSession.eliminatedTeamId 
@@ -86,7 +104,6 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
   const numSeats = teams.length;
 
   const seatCoordinates = teams.map((team, idx) => {
-    // Start from top (-90 deg) and distribute clockwise
     const angle = ((idx * (360 / numSeats)) - 90) * (Math.PI / 180);
     const x = centerX + seatRadius * Math.cos(angle);
     const y = centerY + seatRadius * Math.sin(angle);
@@ -114,10 +131,10 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
   return (
     <div className="w-full space-y-4">
       {/* Header card with gothic flame & stats */}
-      <div className="rounded-2xl border border-[#d4af37]/40 bg-gradient-to-b from-[#241a2a] via-[#14101b] to-[#0a090e] p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+      <div className="rounded-3xl border border-[#d4af37]/40 bg-gradient-to-b from-[#241a2a] via-[#14101b] to-[#0a090e] p-4 sm:p-5 shadow-2xl relative overflow-hidden">
         <div className="flex items-center justify-between border-b border-[#d4af37]/20 pb-3 mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8c1424] to-[#4a050d] border border-[#ff3855]/60 flex items-center justify-center text-[#f6db7e] shadow-lg">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#8c1424] to-[#4a050d] border border-[#ff3855]/60 flex items-center justify-center text-[#f6db7e] shadow-lg">
               <Flame className="w-6 h-6 text-[#ff6b81] animate-pulse" />
             </div>
             <div>
@@ -140,7 +157,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                   : 'text-[#9e9585] hover:text-white'
               }`}
             >
-              🏰 Rundbord
+              🏰 Bord
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -157,8 +174,8 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
 
         <div className="flex items-center justify-between text-xs text-[#c5bca8]">
           <span className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${voteSession.isActive ? 'bg-red-500 animate-ping' : 'bg-gray-500'}`} />
-            {voteSession.isActive ? 'Afstemning i gang • Stemmer er åbne' : 'Rundbordet er i dvale'}
+            <span className={`w-2.5 h-2.5 rounded-full ${voteSession.isActive ? 'bg-red-500 animate-ping' : 'bg-gray-500'}`} />
+            {voteSession.isActive ? 'Afstemning i gang • Åben stemmeafgivelse' : 'Rundbordet er i dvale'}
           </span>
           <span className="font-bold text-[#f6db7e]">
             {totalVotesCast} / {livingTeams.length} har stemt
@@ -168,7 +185,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
 
       {/* Concluded Result Card */}
       {voteSession.isConcluded && eliminatedTeam && (
-        <div className="p-5 rounded-2xl border-2 border-[#c41e3a] bg-gradient-to-b from-[#380a10] to-[#140508] crimson-glow text-center animate-scale-up">
+        <div className="p-5 rounded-3xl border-2 border-[#c41e3a] bg-gradient-to-b from-[#380a10] to-[#140508] crimson-glow text-center animate-scale-up">
           <div className="w-16 h-16 rounded-full bg-[#520d17] border-2 border-[#ff3855] flex items-center justify-center text-[#ff4d6d] mx-auto mb-2 shadow-2xl animate-pulse">
             <Skull className="w-8 h-8" />
           </div>
@@ -189,17 +206,9 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
       {/* ========================================================== */}
       {viewMode === 'table' && (
         <div className="rounded-3xl border border-[#d4af37]/30 bg-gradient-to-b from-[#181322] via-[#0e0c15] to-[#07060a] p-1 sm:p-3 shadow-2xl relative overflow-hidden">
-          {/* Ambient castle glow */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.08)_0%,transparent_70%)] pointer-events-none" />
-
-          {/* SVG Circular Stage */}
           <div className="relative w-full max-w-[520px] mx-auto aspect-square">
-            <svg
-              viewBox="0 0 580 580"
-              className="w-full h-full select-none"
-            >
+            <svg viewBox="0 0 580 580" className="w-full h-full select-none">
               <defs>
-                {/* Wood table radial gradient */}
                 <radialGradient id="tableGradient" cx="50%" cy="50%" r="50%">
                   <stop offset="0%" stopColor="#3d2112" />
                   <stop offset="60%" stopColor="#24130a" />
@@ -207,7 +216,6 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                   <stop offset="100%" stopColor="#d4af37" stopOpacity="0.8" />
                 </radialGradient>
 
-                {/* Center Fire Pit Gradient */}
                 <radialGradient id="firePit" cx="50%" cy="50%" r="50%">
                   <stop offset="0%" stopColor="#ff4d4d" />
                   <stop offset="40%" stopColor="#c41e3a" />
@@ -215,7 +223,6 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                   <stop offset="100%" stopColor="#140608" />
                 </radialGradient>
 
-                {/* Arrow markers for vote beams */}
                 <marker
                   id="voteArrow"
                   viewBox="0 0 10 10"
@@ -241,7 +248,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                 </marker>
               </defs>
 
-              {/* Grand Wood Roundtable Surface */}
+              {/* Roundtable Surface */}
               <circle
                 cx={centerX}
                 cy={centerY}
@@ -252,7 +259,6 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                 className="filter drop-shadow-2xl"
               />
 
-              {/* Table Inner Ring with Gold Runes */}
               <circle
                 cx={centerX}
                 cy={centerY}
@@ -275,7 +281,6 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                 className="animate-pulse"
               />
 
-              {/* Center Table Crest & Info */}
               <g className="pointer-events-none">
                 <text
                   x={centerX}
@@ -311,9 +316,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                 </text>
               </g>
 
-              {/* ====================================================== */}
-              {/* VOTE BEAMS (Lines connecting voters to their targets) */}
-              {/* ====================================================== */}
+              {/* VOTE BEAMS */}
               {Object.values(voteSession.votes || {}).map((vote: VoteRecord) => {
                 const voterSeat = seatCoordinates.find(s => s.team.id === vote.voterTeamId);
                 const targetSeat = seatCoordinates.find(s => s.team.id === vote.targetTeamId);
@@ -323,15 +326,14 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
 
                 return (
                   <g key={`${vote.voterTeamId}-${vote.targetTeamId}`}>
-                    {/* Beam line */}
                     <line
                       x1={voterSeat.tableEdgeX}
                       y1={voterSeat.tableEdgeY}
                       x2={targetSeat.tableEdgeX}
                       y2={targetSeat.tableEdgeY}
                       stroke={isMyVote ? '#f6db7e' : '#ff3855'}
-                      strokeWidth={isMyVote ? '3' : '1.8'}
-                      strokeOpacity={isMyVote ? '0.95' : '0.65'}
+                      strokeWidth={isMyVote ? '3.2' : '1.8'}
+                      strokeOpacity={isMyVote ? '1' : '0.65'}
                       strokeDasharray={isMyVote ? 'none' : '4 3'}
                       markerEnd={isMyVote ? 'url(#myVoteArrow)' : 'url(#voteArrow)'}
                     />
@@ -339,29 +341,22 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                 );
               })}
 
-              {/* ====================================================== */}
-              {/* 14 SEATS AROUND THE ROUNDTABLE WITH NAMES & NUMBERS    */}
-              {/* ====================================================== */}
+              {/* 14 SEATS AROUND THE TABLE */}
               {seatCoordinates.map(({ team, idx, x, y, labelX, labelY, firstNames }) => {
                 const count = voteCounts[team.id] || 0;
                 const isSelected = myVote?.targetTeamId === team.id;
                 const isMe = currentTeam && team.id === currentTeam.id;
-                const isInspected = inspectSeatId === team.id;
+                const isLeader = leaderTeamId === team.id && count > 1;
 
-                const seatR = isMe ? 21 : 18;
+                const seatR = isMe ? 22 : 18;
 
                 return (
                   <g
                     key={team.id}
                     className="cursor-pointer transition-transform duration-200"
-                    onClick={() => {
-                      setInspectSeatId(team.id);
-                      if (voteSession.isActive && currentTeam && currentTeam.isAlive && !isMe) {
-                        handleCastVote(team.id);
-                      }
-                    }}
+                    onClick={() => handleOpenConfirm(team)}
                   >
-                    {/* Pulsing selection aura */}
+                    {/* Active Selection Ring */}
                     {isSelected && (
                       <circle
                         cx={x}
@@ -376,7 +371,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                       />
                     )}
 
-                    {/* Seat circle */}
+                    {/* Seat Circle */}
                     <circle
                       cx={x}
                       cy={y}
@@ -405,7 +400,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                       className="filter drop-shadow-md"
                     />
 
-                    {/* Seat Number */}
+                    {/* Number / Label */}
                     <text
                       x={x}
                       y={y + 4}
@@ -425,7 +420,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                       {!team.isAlive ? '☠️' : isMe ? 'DIG' : `${idx + 1}`}
                     </text>
 
-                    {/* Participant First Names Label outside Seat */}
+                    {/* First Names Label */}
                     <text
                       x={labelX}
                       y={labelY + 3}
@@ -441,27 +436,27 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                           ? '#fce8e8'
                           : '#a89f8d'
                       }
-                      fontSize="8.5"
+                      fontSize="9"
                       fontWeight="800"
                       className="tracking-tight"
                       style={{
                         paintOrder: 'stroke',
                         stroke: '#08070b',
-                        strokeWidth: '2.5px',
+                        strokeWidth: '2.8px',
                         strokeLinejoin: 'round'
                       }}
                     >
                       {firstNames}
                     </text>
 
-                    {/* Vote Count Badge on Seat (if targeted) */}
+                    {/* Vote Count Badge */}
                     {count > 0 && (
                       <g transform={`translate(${x + 11}, ${y - 12})`}>
                         <circle
                           cx="0"
                           cy="0"
                           r="9"
-                          fill="#c41e3a"
+                          fill={isLeader ? '#ff3855' : '#c41e3a'}
                           stroke="#ffffff"
                           strokeWidth="1.2"
                         />
@@ -483,18 +478,17 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
             </svg>
           </div>
 
-          {/* Helper caption below table */}
           <div className="mt-1 text-center text-[11px] text-[#9e9585]">
-            💡 <strong className="text-[#f6db7e]">Tip:</strong> Tryk direkte på en stol for at pege på holdet eller se hvem der stemmer på dem!
+            💡 <strong className="text-[#f6db7e]">Tip:</strong> Tryk på en stol for at stemme på holdet.
           </div>
         </div>
       )}
 
       {/* ========================================================== */}
-      {/* 📋 VIEW 2: LIST VIEW (ALTERNATIVE STEMMETAVLE)            */}
+      {/* 📋 VIEW 2: LIST VIEW                                      */}
       {/* ========================================================== */}
       {viewMode === 'list' && (
-        <div className="rounded-2xl border border-white/10 bg-[#121118] p-4 space-y-2">
+        <div className="rounded-3xl border border-white/10 bg-[#121118] p-4 space-y-2">
           <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] mb-2 flex items-center gap-1.5">
             <Users className="w-4 h-4 text-[#f6db7e]" />
             Åben Stemmetavle
@@ -509,8 +503,8 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
             return (
               <div
                 key={team.id}
-                onClick={() => setInspectSeatId(team.id)}
-                className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                onClick={() => handleOpenConfirm(team)}
+                className={`p-3 rounded-2xl border transition-all cursor-pointer ${
                   count > 0
                     ? 'bg-[#1e1724] border-[#d4af37]/40'
                     : 'bg-black/20 border-white/5 opacity-80'
@@ -551,47 +545,44 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
         </div>
       )}
 
-      {/* Selected / Inspected Seat Card Drawer */}
-      {inspectSeatId && (
-        <div className="p-4 rounded-2xl border-2 border-[#d4af37]/60 bg-gradient-to-b from-[#201a2c] to-[#0f0e15] shadow-xl flex items-center justify-between gap-3 animate-fade-in">
-          {(() => {
-            const inspectedTeam = teams.find(t => t.id === inspectSeatId);
-            if (!inspectedTeam) return null;
-            const count = voteCounts[inspectedTeam.id] || 0;
-            const voters = votersForTeam[inspectedTeam.id] || [];
-            const isMe = currentTeam && inspectedTeam.id === currentTeam.id;
-            const isSelected = myVote?.targetTeamId === inspectedTeam.id;
+      {/* ========================================================== */}
+      {/* 🛑 CONFIRMATION BOTTOM SHEET MODAL                         */}
+      {/* ========================================================== */}
+      {confirmTargetTeam && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md p-5 rounded-3xl border-2 border-[#ff3855] bg-gradient-to-b from-[#2a090e] to-[#120508] shadow-2xl text-center crimson-glow animate-slide-up">
+            <div className="w-12 h-12 rounded-full bg-[#520d17] border border-[#ff3855] flex items-center justify-center text-[#ff4d6d] mx-auto mb-3">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
 
-            return (
-              <>
-                <div className="min-w-0 flex-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#d4af37] block">
-                    Valgt Plads ved Rundbordet
-                  </span>
-                  <h4 className="text-sm font-black font-gothic text-white truncate">
-                    {inspectedTeam.name}
-                  </h4>
-                  <p className="text-[11px] text-[#9e9585]">
-                    {count} {count === 1 ? 'stemme modtaget' : 'stemmer modtaget'}
-                    {voters.length > 0 && ` (${voters.join(', ')})`}
-                  </p>
-                </div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[#ff8095]">
+              Bekræft Forvisnings-Stemme
+            </span>
 
-                {voteSession.isActive && currentTeam && currentTeam.isAlive && !isMe && (
-                  <button
-                    onClick={() => handleCastVote(inspectedTeam.id)}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shrink-0 cursor-pointer ${
-                      isSelected
-                        ? 'bg-green-700 text-white'
-                        : 'btn-crimson'
-                    }`}
-                  >
-                    {isSelected ? '✓ Din Stemme' : 'Stem på dette hold'}
-                  </button>
-                )}
-              </>
-            );
-          })()}
+            <h3 className="text-lg font-black font-gothic text-white mt-1 mb-1">
+              {confirmTargetTeam.name}
+            </h3>
+
+            <p className="text-xs text-[#e6dfd1]/80 max-w-xs mx-auto mb-4">
+              Er du sikker på, at du vil pege på dette hold til forvisning fra slottet?
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmTargetTeam(null)}
+                className="flex-1 py-3 rounded-xl bg-black/60 border border-white/20 text-xs font-bold text-[#c5bca8] hover:text-white"
+              >
+                Annuller
+              </button>
+              <button
+                onClick={handleExecuteVote}
+                className="flex-1 py-3 rounded-xl btn-crimson text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Bekræft Min Stemme
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

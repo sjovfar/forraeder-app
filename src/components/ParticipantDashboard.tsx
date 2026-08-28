@@ -18,7 +18,6 @@ import {
   Flame,
   CheckCircle2,
   BookOpen,
-  Coins,
   ShieldCheck
 } from 'lucide-react';
 
@@ -74,29 +73,6 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
 
       {/* Main Content Area */}
       <div className="w-full max-w-md mx-auto p-4 space-y-4 pt-safe">
-        {/* Treasury Prize Pool Bar */}
-        <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-[#2a2010] via-[#1a140d] to-[#2a2010] border border-[#d4af37]/40 shadow-lg">
-          <div className="flex items-center gap-2">
-            <Coins className="w-5 h-5 text-[#f6db7e] animate-pulse" />
-            <div>
-              <span className="text-[9px] uppercase font-black tracking-widest text-[#d4af37] block">
-                Slottets Skatkammer
-              </span>
-              <span className="text-xs font-black text-white">
-                {gameState.silverBars} Sølvbarrer indsamlet
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowNotesModal(true)}
-            className="px-3 py-1.5 rounded-xl bg-black/50 border border-white/15 text-xs font-bold text-[#f6db7e] hover:border-[#d4af37] flex items-center gap-1.5 cursor-pointer shadow-sm"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Noter 📝</span>
-          </button>
-        </div>
-
         {/* Top Status Header */}
         <div className="castle-card rounded-3xl p-4 border border-[#d4af37]/35 shadow-xl relative overflow-hidden">
           <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
@@ -114,13 +90,23 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={onLogout}
-              className="p-2 rounded-xl bg-black/40 text-[#9e9585] hover:text-white border border-white/5 transition-colors"
-              title="Log ud"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowNotesModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-black/50 border border-white/15 text-xs font-bold text-[#f6db7e] hover:border-[#d4af37] flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Noter 📝</span>
+              </button>
+
+              <button
+                onClick={onLogout}
+                className="p-2 rounded-xl bg-black/40 text-[#9e9585] hover:text-white border border-white/5 transition-colors"
+                title="Log ud"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -139,7 +125,7 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
               {hasShield && isAlive && (
                 <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#3d2e0a] border border-[#d4af37] text-[#f6db7e] flex items-center gap-1 shadow-md animate-pulse">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#f6db7e]" />
-                  <span>Skjold</span>
+                  <span>Skjold Aktivt</span>
                 </span>
               )}
             </div>

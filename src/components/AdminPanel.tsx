@@ -26,12 +26,11 @@ import {
   AlertOctagon,
   Gamepad2,
   Sliders,
-  Coins,
   ShieldCheck,
   Coffee,
   Mail,
-  Plus,
-  Minus
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -46,6 +45,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
   const [broadcastTitle, setBroadcastTitle] = useState('Besked fra Slottets Værter');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastSound, setBroadcastSound] = useState<SoundType>('bell');
+
+  // Morning reveal selection
+  const [morningMurderTargetId, setMorningMurderTargetId] = useState<string>('auto');
 
   // Spy chat state
   const [spyMessageInput, setSpyMessageInput] = useState('');
@@ -107,9 +109,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       sound: 'thunder' as SoundType
     },
     {
-      title: 'Sølvbarrer Vundet!',
-      message: 'Deltagerne har gennemført slottets udfordring og øget præmieskatten!',
-      sound: 'coins' as SoundType
+      title: 'Våbenskjold Uddelt!',
+      message: 'Et hold har vundet slottets beskyttende våbenskjold for den kommende nat!',
+      sound: 'shield' as SoundType
     }
   ];
 
@@ -121,7 +123,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
     { label: 'Kirkeklokke', sound: 'bell', icon: '🔔', desc: 'Gotisk slotsklokke' },
     { label: 'Dødsgong', sound: 'gong', icon: '💥', desc: 'Dommedags-sub-bas' },
     { label: 'Spøgelses-Drone', sound: 'drone', icon: '👻', desc: 'Dissonant gys' },
-    { label: 'Sølvmønter', sound: 'coins', icon: '💰', desc: 'Klingende sølvskat' },
+    { label: 'Slots-Alarm', sound: 'alarm', icon: '🚨', desc: 'Presserende sirene' },
     { label: 'Våbenskjold', sound: 'shield', icon: '🛡️', desc: 'Tung gylden klokkeklang' },
   ];
 
@@ -130,6 +132,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
   const livingTeams = gameState.teams.filter(t => t.isAlive);
   const deadTeams = gameState.teams.filter(t => !t.isAlive);
   const pendingMurders = gameState.murderProposals.filter(p => p.status === 'pending');
+  const hasPendingRecruitment = gameState.recruitment && gameState.recruitment.status === 'pending_admin';
 
   const handleRandomizeRoles = () => {
     if (confirm('Er du sikker på, at du vil tildele 3 tilfældige Forrædere og 11 Loyale?')) {
@@ -154,10 +157,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
 
   const handleToggleShield = (teamId: string) => {
     socket.emit('admin:toggle_shield', { teamId });
-  };
-
-  const handleUpdateSilver = (delta: number) => {
-    socket.emit('admin:update_silver', { delta });
   };
 
   const handleSendBroadcast = (e?: React.FormEvent) => {
@@ -234,7 +233,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
   };
 
   const handleStartMorningReveal = () => {
-    socket.emit('admin:start_morning_reveal');
+    if (morningMurderTargetId === 'none') {
+      socket.emit('admin:start_morning_reveal', { noMurder: true });
+    } else if (morningMurderTargetId === 'auto') {
+      socket.emit('admin:start_morning_reveal', {});
+    } else {
+      socket.emit('admin:start_morning_reveal', { murderedTeamId: morningMurderTargetId });
+    }
+  };
+
+  const handleHandleRecruitment = (action: 'approved' | 'rejected') => {
+    socket.emit('admin:handle_recruitment_proposal', { action });
   };
 
   const handleResetGame = () => {
@@ -262,31 +271,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Treasury Quick Controller */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/60 border border-[#d4af37]/40 shadow-inner">
-            <Coins className="w-4 h-4 text-[#f6db7e]" />
-            <span className="text-xs font-black text-white">{gameState.silverBars}</span>
-            <div className="flex gap-1 ml-1">
-              <button
-                onClick={() => handleUpdateSilver(1)}
-                className="w-5 h-5 rounded bg-[#d4af37] text-black font-black text-[10px] flex items-center justify-center cursor-pointer hover:bg-yellow-300"
-                title="+1 Sølvbarre"
-              >
-                +
-              </button>
-              <button
-                onClick={() => handleUpdateSilver(-1)}
-                className="w-5 h-5 rounded bg-zinc-800 text-white font-black text-[10px] flex items-center justify-center cursor-pointer hover:bg-zinc-700"
-                title="-1 Sølvbarre"
-              >
-                -
-              </button>
-            </div>
-          </div>
-
           <button
             onClick={handleForceLogoutAll}
-            className="px-3 py-1.5 rounded-xl bg-[#520d17] border border-[#ff3855] text-[#ff8095] hover:bg-[#8c1424] text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-md active:scale-95 cursor-pointer"
+            className="px-3 py-2 rounded-xl bg-[#520d17] border border-[#ff3855] text-[#ff8095] hover:bg-[#8c1424] text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-md active:scale-95 cursor-pointer"
             title="Tving logout på alle enheder"
           >
             <AlertOctagon className="w-3.5 h-3.5 text-[#ff4d6d]" />
@@ -320,9 +307,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         >
           <Eye className="w-4 h-4" />
           <span>Forrædere</span>
-          {pendingMurders.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[9px]">
-              {pendingMurders.length}
+          {(pendingMurders.length > 0 || hasPendingRecruitment) && (
+            <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[9px] animate-pulse font-black">
+              {pendingMurders.length + (hasPendingRecruitment ? 1 : 0)}
             </span>
           )}
         </button>
@@ -357,34 +344,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       {/* ========================================================= */}
       {activeHub === 'live' && (
         <div className="space-y-4">
-          {/* Quick Morning Reveal Trigger */}
-          <div className="p-4 rounded-3xl border border-[#d4af37]/35 bg-[#16141e] flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl">
-            <div>
+          {/* Interactive Morning Reveal Trigger Card */}
+          <div className="p-4 rounded-3xl border border-[#d4af37]/40 bg-[#191522] space-y-3 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
                 <Coffee className="w-4 h-4 text-[#d4af37]" />
                 Morgensamling (Hvem Overlevede Natten?)
               </h3>
-              <p className="text-[10px] text-[#9e9585]">
-                Udsender en dramatisk ankomst-sekvens til alle telefoner om morgenen.
-              </p>
+              {gameState.morningReveal?.isActive && (
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-yellow-950 text-yellow-300 border border-yellow-700 animate-pulse">
+                  Aktiv på mobiler ☕
+                </span>
+              )}
             </div>
 
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button
-                onClick={handleStartMorningReveal}
-                className="flex-1 sm:flex-none px-4 py-2.5 rounded-2xl btn-gold text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
-              >
-                Start Morgensamling ☕
-              </button>
+            <p className="text-[11px] text-[#c5bca8]">
+              Vælg hvem der blev myrdet i nat, og start morgensamlingen for alle deltagere på én gang:
+            </p>
 
-              {gameState.morningReveal?.isActive && (
+            <div className="space-y-2">
+              <select
+                value={morningMurderTargetId}
+                onChange={(e) => setMorningMurderTargetId(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-black/60 border border-[#d4af37]/30 text-xs text-white"
+              >
+                <option value="auto">-- Automatisk (Seneste godkendte mord i nat) --</option>
+                <option value="none">🛡️ Ingen blev myrdet i nat (Skjold / Fredelig nat)</option>
+                {gameState.teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    ☠️ {t.name} {!t.isAlive && '(Allerede markeret død)'}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex gap-2 pt-1">
                 <button
-                  onClick={() => socket.emit('admin:end_morning_reveal')}
-                  className="px-3 py-2.5 rounded-2xl bg-black/60 border border-white/20 text-xs font-bold text-[#c5bca8]"
+                  onClick={handleStartMorningReveal}
+                  className="flex-1 py-3 rounded-2xl btn-gold text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  Luk
+                  <Coffee className="w-4 h-4" />
+                  Udsend Morgensamling til Alle Telefoner
                 </button>
-              )}
+
+                {gameState.morningReveal?.isActive && (
+                  <button
+                    onClick={() => socket.emit('admin:end_morning_reveal')}
+                    className="px-4 py-3 rounded-2xl bg-black/60 border border-white/20 text-xs font-bold text-[#c5bca8] hover:text-white"
+                  >
+                    Luk For Alle
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -553,7 +563,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Toggle Shield Button */}
                     {team.isAlive && (
                       <button
                         onClick={() => handleToggleShield(team.id)}
@@ -589,21 +598,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       {/* ========================================================= */}
       {activeHub === 'traitors' && (
         <div className="space-y-4">
-          {/* Active Recruitment Status */}
-          {gameState.recruitment && gameState.recruitment.isActive && (
-            <div className="p-4 rounded-3xl border-2 border-[#d4af37] bg-[#2a1d08] space-y-1.5 shadow-xl animate-pulse">
+          {/* Recruitment Proposal Authorization Card */}
+          {gameState.recruitment && gameState.recruitment.status === 'pending_admin' && (
+            <div className="p-4 rounded-3xl border-2 border-[#d4af37] bg-gradient-to-r from-[#2a1d08] via-[#3d2a0b] to-[#2a1d08] space-y-2 shadow-2xl gold-glow animate-pulse">
               <div className="flex items-center gap-2">
                 <Mail className="w-5 h-5 text-[#f6db7e]" />
                 <h4 className="text-xs font-black uppercase tracking-wider text-[#f6db7e]">
-                  Aktiv Rekrutterings-Forespørgsel!
+                  Vært-Godkendelse Påkrævet: Rekruttering
                 </h4>
               </div>
               <p className="text-xs text-white">
-                Forræderne har tilbudt en plads til: <strong>{gameState.recruitment.targetTeamName}</strong>.
+                Forræderne anmoder om tilladelse til at sende et hemmeligt rekrutterings-brev til: <strong className="text-[#f6db7e]">{gameState.recruitment.targetTeamName}</strong>.
               </p>
-              <span className="text-[10px] text-[#e6dfd1]/70 block">
-                Afventer svar på deltagerens telefon...
-              </span>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => handleHandleRecruitment('approved')}
+                  className="flex-1 py-2.5 rounded-xl btn-gold text-black text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Godkend & Send Brev 💌
+                </button>
+                <button
+                  onClick={() => handleHandleRecruitment('rejected')}
+                  className="flex-1 py-2.5 rounded-xl bg-black/60 border border-white/20 text-xs font-bold text-[#c5bca8] hover:text-white uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Afvis Rekruttering
+                </button>
+              </div>
+            </div>
+          )}
+
+          {gameState.recruitment && gameState.recruitment.status === 'dispatched' && (
+            <div className="p-3 rounded-2xl bg-[#2a1d08] border border-[#d4af37]/50 text-xs text-[#f6db7e] flex items-center justify-between">
+              <span>💌 Brev sendt til <strong>{gameState.recruitment.targetTeamName}</strong>. Afventer svar...</span>
+              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
             </div>
           )}
 

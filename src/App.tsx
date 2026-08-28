@@ -8,7 +8,8 @@ import { AdminPanel } from './components/AdminPanel';
 import { BroadcastOverlay } from './components/BroadcastOverlay';
 import { RecruitmentOverlay } from './components/RecruitmentOverlay';
 import { MorningRevealOverlay } from './components/MorningRevealOverlay';
-import { Shield, Crown, WifiOff, LogOut, AlertTriangle, Coins } from 'lucide-react';
+import { DeathOverlay } from './components/DeathOverlay';
+import { Shield, Crown, WifiOff, LogOut, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [session, setSession] = useState<UserSession | null>(() => {
@@ -30,7 +31,6 @@ export const App: React.FC = () => {
       hasShield: false,
       roleRevealed: false
     })),
-    silverBars: 0,
     voteSession: {
       isActive: false,
       roundNumber: 1,
@@ -58,6 +58,14 @@ export const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState<boolean>(socket.connected);
   const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string | null>(null);
   const [dismissedMorningRevealTimestamp, setDismissedMorningRevealTimestamp] = useState<number | null>(null);
+  const [dismissedDeathTimestamp, setDismissedDeathTimestamp] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem('forraeder_dismissed_death');
+      return saved ? Number(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [forceLogoutNotice, setForceLogoutNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,6 +86,7 @@ export const App: React.FC = () => {
     function onForceLogout(data: { message?: string }) {
       try {
         localStorage.removeItem('forraeder_session');
+        localStorage.removeItem('forraeder_dismissed_death');
       } catch {}
       setSession(null);
       setForceLogoutNotice(data?.message || 'Slottets Værter har nulstillet alle login-sessioner.');
@@ -114,6 +123,15 @@ export const App: React.FC = () => {
     } catch {}
   };
 
+  const handleDismissDeath = (eliminatedTimestamp: number) => {
+    setDismissedDeathTimestamp(eliminatedTimestamp);
+    try {
+      localStorage.setItem('forraeder_dismissed_death', String(eliminatedTimestamp));
+    } catch {}
+  };
+
+  const currentTeam = session?.type === 'team' ? gameState.teams.find(t => t.id === session.id) : null;
+
   const activeBroadcastToShow =
     gameState.activeBroadcast && gameState.activeBroadcast.id !== dismissedBroadcastId
       ? gameState.activeBroadcast
@@ -130,6 +148,12 @@ export const App: React.FC = () => {
     gameState.recruitment &&
     gameState.recruitment.isActive &&
     gameState.recruitment.targetTeamId === session.id;
+
+  // Show death popup if current logged in team is eliminated and hasn't dismissed this death event
+  const showDeathOverlay =
+    currentTeam &&
+    !currentTeam.isAlive &&
+    (currentTeam.eliminatedAt || 1) !== dismissedDeathTimestamp;
 
   return (
     <div className="min-h-screen bg-[#0a090d] text-[#e6dfd1] font-sans antialiased selection:bg-[#c41e3a] selection:text-white">
@@ -179,6 +203,14 @@ export const App: React.FC = () => {
           morningReveal={gameState.morningReveal!}
           teams={gameState.teams}
           onDismiss={() => setDismissedMorningRevealTimestamp(gameState.morningReveal!.timestamp)}
+        />
+      )}
+
+      {/* Death Announcement Popup Modal for Eliminated Player */}
+      {showDeathOverlay && currentTeam && (
+        <DeathOverlay
+          team={currentTeam}
+          onDismiss={() => handleDismissDeath(currentTeam.eliminatedAt || 1)}
         />
       )}
 

@@ -28,7 +28,8 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  const livingLoyals = teams.filter(t => t.isAlive && (t.role === 'loyal' || t.role === 'unassigned' || isAdmin));
+  // Exclude traitors from being target of murder or recruitment
+  const livingTargets = teams.filter(t => t.isAlive && t.role !== 'traitor' && t.id !== currentTeam?.id);
   const traitors = teams.filter(t => t.role === 'traitor');
 
   useEffect(() => {
@@ -86,6 +87,9 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
     if (!recruitTargetId) return;
 
     soundEngine.playWhisper();
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate([60, 40, 80]); } catch {}
+    }
     socket.emit('traitor:propose_recruitment', { targetTeamId: recruitTargetId });
     setRecruitTargetId('');
     setShowRecruitModal(false);
@@ -182,7 +186,7 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
           <button
             type="submit"
             disabled={!inputText.trim()}
-            className="p-2.5 rounded-xl btn-crimson text-white shrink-0 disabled:opacity-40"
+            className="p-2.5 rounded-xl btn-crimson text-white shrink-0 disabled:opacity-40 cursor-pointer"
           >
             <Send className="w-4 h-4" />
           </button>
@@ -211,7 +215,7 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
             <form onSubmit={handleProposeMurder} className="space-y-3">
               <div>
                 <label className="block text-[11px] text-[#c5bca8] mb-1 font-medium">
-                  Vælg et levende hold som offer:
+                  Vælg et levende loyalt hold som offer:
                 </label>
                 <select
                   value={targetTeamId}
@@ -219,9 +223,9 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
                   className="w-full p-3 rounded-xl bg-[#200a0e] border border-[#ff3855]/40 text-xs text-white focus:outline-none focus:border-[#ff3855]"
                 >
                   <option value="">-- Vælg hold --</option>
-                  {livingLoyals.map((team) => (
+                  {livingTargets.map((team) => (
                     <option key={team.id} value={team.id}>
-                      {team.name} {team.hasShield && '(🛡️ Har Skjold)'}
+                      {team.name} {team.hasShield && '(🛡️ Har Våbenskjold)'}
                     </option>
                   ))}
                 </select>
@@ -248,7 +252,7 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
                 <button
                   type="submit"
                   disabled={!targetTeamId || isSubmittingProposal}
-                  className="flex-1 py-2.5 rounded-xl btn-crimson text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40"
+                  className="flex-1 py-2.5 rounded-xl btn-crimson text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40 cursor-pointer"
                 >
                   <Skull className="w-4 h-4" />
                   Send Mord-anmodning
@@ -279,7 +283,7 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
             </div>
 
             <p className="text-xs text-[#e6dfd1]/80 mb-3 leading-relaxed">
-              Vælg et loyalt hold. De modtager et hemmeligt tilbud på deres telefon om at slutte sig til forræderne.
+              Vælg et loyalt hold. Værterne modtager jeres anmodning til godkendelse, hvorefter brevet sendes til holdets telefon.
             </p>
 
             <form onSubmit={handleProposeRecruitment} className="space-y-3">
@@ -290,7 +294,7 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
                   className="w-full p-3 rounded-xl bg-black/50 border border-[#d4af37]/40 text-xs text-white"
                 >
                   <option value="">-- Vælg loyalt hold der skal rekrutteres --</option>
-                  {livingLoyals.map((team) => (
+                  {livingTargets.map((team) => (
                     <option key={team.id} value={team.id}>
                       {team.name}
                     </option>
@@ -309,10 +313,10 @@ export const TraitorConclave: React.FC<TraitorConclaveProps> = ({
                 <button
                   type="submit"
                   disabled={!recruitTargetId}
-                  className="flex-1 py-2.5 rounded-xl btn-gold text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40"
+                  className="flex-1 py-2.5 rounded-xl btn-gold text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-40 cursor-pointer"
                 >
                   <Mail className="w-4 h-4" />
-                  Send Rekruttering
+                  Anmod Værter
                 </button>
               </div>
             </form>

@@ -139,7 +139,7 @@ export const INITIAL_TEAMS: Array<{ id: string; name: string; players: string[] 
   { id: 'team-7', name: 'Mikkel Aarup / Maja Mondrup', players: ['Mikkel Aarup', 'Maja Mondrup'] },
   { id: 'team-8', name: 'Ivan Mirmojtahedi / Gustav Worm', players: ['Ivan Mirmojtahedi', 'Gustav Worm'] },
   { id: 'team-9', name: 'Jakob Hemmingsen / Nicoline Mortensen', players: ['Jakob Hemmingsen', 'Nicoline Mortensen'] },
-  { id: 'team-10', name: 'Christian Liebe-Lind / Clara Steen-Peters-en', players: ['Christian Liebe-Lind', 'Clara Steen-Petersen'] },
+  { id: 'team-10', name: 'Christian Liebe-Lind / Clara Steen-Petersen', players: ['Christian Liebe-Lind', 'Clara Steen-Petersen'] },
   { id: 'team-11', name: 'Thomas Asboe / Cathrine Albrechtslund', players: ['Thomas Asboe', 'Cathrine Albrechtslund'] },
   { id: 'team-12', name: 'Anna Keergaard / Christian Daniel Gawelda Frøslev', players: ['Anna Keergaard', 'Christian Daniel Gawelda Frøslev'] },
   { id: 'team-13', name: 'Julius Heilmann / Caroline Lindeman', players: ['Julius Heilmann', 'Caroline Lindeman'] },

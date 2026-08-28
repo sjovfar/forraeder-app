@@ -110,6 +110,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               onClick={() => {
                 setMode('admin');
                 setPinError(false);
+                setAdminPin('');
               }}
               className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 mode === 'admin'
@@ -206,7 +207,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             </div>
           ) : (
             /* ======================================================== */
-            /* 👑 HOST (ADMIN) SELECTOR & PIN PAD                       */
+            /* 👑 HOST (ADMIN) SELECTOR & BLANK PIN PAD                 */
             /* ======================================================== */
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
@@ -244,13 +245,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   type="password"
                   inputMode="numeric"
                   maxLength={10}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={adminPin}
                   onChange={(e) => {
                     setAdminPin(e.target.value);
                     setPinError(false);
                   }}
-                  placeholder="••••"
-                  className="w-full p-3.5 rounded-2xl bg-black/60 border border-white/10 text-center tracking-[0.4em] text-base font-black text-white placeholder:text-[#9e9585]/40 focus:outline-none focus:border-[#d4af37]"
+                  placeholder=""
+                  className="w-full p-3.5 rounded-2xl bg-black/60 border border-white/10 text-center tracking-[0.4em] text-base font-black text-white focus:outline-none focus:border-[#d4af37]"
                 />
                 {pinError && (
                   <p className="text-[11px] text-[#ff6b81] mt-1.5 font-bold text-center animate-shake">

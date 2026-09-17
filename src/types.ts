@@ -78,23 +78,6 @@ export interface ChatMessage {
   isSystem?: boolean;
 }
 
-export interface PartnerSwapSession {
-  isActive: boolean;
-  durationSeconds: number;
-  startedAt: number;
-  expiresAt: number;
-  winnerTeamId?: string;
-  winnerTeamName?: string;
-  winnerTimestamp?: number;
-  isCompleted: boolean;
-  swappedDetails?: {
-    teamId: string;
-    originalPlayer: string;
-    newPlayer: string;
-    fromDeadTeamName: string;
-  };
-}
-
 export type SoundType = 
   | 'bell' 
   | 'gong' 
@@ -119,7 +102,6 @@ export interface BroadcastEvent {
 export interface GameState {
   teams: Team[];
   voteSession: VoteSession;
-  partnerSwap: PartnerSwapSession;
   recruitment: RecruitmentSession | null;
   morningReveal: MorningRevealSession | null;
   murderProposals: MurderProposal[];
@@ -129,22 +111,7 @@ export interface GameState {
   lastUpdated: number;
 }
 
-export const INITIAL_TEAMS: Array<{ id: string; name: string; players: string[] }> = [
-  { id: 'team-1', name: 'Nicolai Herbert / Tobias Terney', players: ['Nicolai Herbert', 'Tobias Terney'] },
-  { id: 'team-2', name: 'Magnus Libergren / Freja Jensen', players: ['Magnus Libergren', 'Freja Jensen'] },
-  { id: 'team-3', name: 'Andreas Rosling / Laura??', players: ['Andreas Rosling', 'Laura??'] },
-  { id: 'team-4', name: 'Rasmus Boas / Rebekka Busck', players: ['Rasmus Boas', 'Rebekka Busck'] },
-  { id: 'team-5', name: 'Philip Koch / Sebastian Poulsen', players: ['Philip Koch', 'Sebastian Poulsen'] },
-  { id: 'team-6', name: 'Nicolai Gregersen / Anna Søeberg', players: ['Nicolai Gregersen', 'Anna Søeberg'] },
-  { id: 'team-7', name: 'Mikkel Aarup / Maja Mondrup', players: ['Mikkel Aarup', 'Maja Mondrup'] },
-  { id: 'team-8', name: 'Ivan Mirmojtahedi / Gustav Worm', players: ['Ivan Mirmojtahedi', 'Gustav Worm'] },
-  { id: 'team-9', name: 'Jakob Hemmingsen / Nicoline Mortensen', players: ['Jakob Hemmingsen', 'Nicoline Mortensen'] },
-  { id: 'team-10', name: 'Christian Liebe-Lind / Clara Steen-Petersen', players: ['Christian Liebe-Lind', 'Clara Steen-Petersen'] },
-  { id: 'team-11', name: 'Thomas Asboe / Cathrine Albrechtslund', players: ['Thomas Asboe', 'Cathrine Albrechtslund'] },
-  { id: 'team-12', name: 'Anna Keergaard / Christian Daniel Gawelda Frøslev', players: ['Anna Keergaard', 'Christian Daniel Gawelda Frøslev'] },
-  { id: 'team-13', name: 'Julius Heilmann / Caroline Lindeman', players: ['Julius Heilmann', 'Caroline Lindeman'] },
-  { id: 'team-14', name: 'Caroline Nygaard / Jesper Møller', players: ['Caroline Nygaard', 'Jesper Møller'] },
-];
+export const INITIAL_TEAMS: Array<{ id: string; name: string; players: string[] }> = [];
 
 export const ADMIN_USERS = [
   { id: 'admin-julius', name: 'Julius Tuxen (Vært)' },

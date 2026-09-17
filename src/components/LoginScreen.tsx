@@ -1,62 +1,92 @@
 import React, { useState } from 'react';
-import { INITIAL_TEAMS, ADMIN_USERS, UserSession } from '../types';
+import { Team, ADMIN_USERS, UserSession } from '../types';
+import { socket } from '../socket';
 import { soundEngine } from '../soundEngine';
-import { Shield, Lock, Crown, Users, ChevronRight, Search, Sparkles } from 'lucide-react';
+import { Shield, Lock, Crown, Users, ChevronRight, Search, PlusCircle, UserCheck } from 'lucide-react';
 
 interface LoginScreenProps {
+  teams: Team[];
   onLogin: (session: UserSession) => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
-  const [mode, setMode] = useState<'team' | 'admin'>('team');
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(INITIAL_TEAMS[0].id);
+export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
+  const [mode, setMode] = useState<'create' | 'choose' | 'admin'>('create');
+  const [newTeamName, setNewTeamName] = useState<string>('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [selectedAdminId, setSelectedAdminId] = useState<string>(ADMIN_USERS[0].id);
   const [adminPin, setAdminPin] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const filteredTeams = INITIAL_TEAMS.filter(t => 
+  const filteredTeams = teams.filter(t => 
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.players.some(p => p.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleLoginSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // 1. Create and Register New Team Dynamically
+  const handleCreateTeamSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newTeamName.trim();
+    if (!trimmed || isSubmitting) return;
 
-    if (mode === 'team') {
-      const team = INITIAL_TEAMS.find(t => t.id === selectedTeamId);
-      if (!team) return;
-
-      soundEngine.playBell();
-      if ('vibrate' in navigator) {
-        try { navigator.vibrate(50); } catch {}
-      }
-      onLogin({
-        type: 'team',
-        id: team.id,
-        name: team.name
-      });
-    } else {
-      // Secret Admin PIN validation: "2026"
-      if (adminPin.trim() !== '2026') {
-        setPinError(true);
-        soundEngine.playTick();
-        if ('vibrate' in navigator) {
-          try { navigator.vibrate([100, 50, 100]); } catch {}
-        }
-        return;
-      }
-
-      const admin = ADMIN_USERS.find(a => a.id === selectedAdminId);
-      if (!admin) return;
-
-      soundEngine.playVictory();
-      onLogin({
-        type: 'admin',
-        id: admin.id,
-        name: admin.name
-      });
+    setIsSubmitting(true);
+    soundEngine.playBell();
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(50); } catch {}
     }
+
+    socket.emit('team:register', { name: trimmed }, (res: { success: boolean; team: Team }) => {
+      setIsSubmitting(false);
+      if (res?.success && res.team) {
+        onLogin({
+          type: 'team',
+          id: res.team.id,
+          name: res.team.name
+        });
+      }
+    });
+
+    // Fallback if no callback within 800ms
+    setTimeout(() => {
+      setIsSubmitting(false);
+    }, 1200);
+  };
+
+  // 2. Select Existing Registered Team
+  const handleSelectExistingTeam = (team: Team) => {
+    soundEngine.playBell();
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(50); } catch {}
+    }
+    onLogin({
+      type: 'team',
+      id: team.id,
+      name: team.name
+    });
+  };
+
+  // 3. Admin Login
+  const handleAdminSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPin.trim() !== '2026') {
+      setPinError(true);
+      soundEngine.playTick();
+      if ('vibrate' in navigator) {
+        try { navigator.vibrate([100, 50, 100]); } catch {}
+      }
+      return;
+    }
+
+    const admin = ADMIN_USERS.find(a => a.id === selectedAdminId);
+    if (!admin) return;
+
+    soundEngine.playVictory();
+    onLogin({
+      type: 'admin',
+      id: admin.id,
+      name: admin.name
+    });
   };
 
   return (
@@ -91,19 +121,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           <div className="flex p-1 rounded-2xl bg-black/60 border border-white/10 mb-4">
             <button
               type="button"
-              onClick={() => {
-                setMode('team');
-                setPinError(false);
-              }}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                mode === 'team'
+              onClick={() => setMode('create')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                mode === 'create'
                   ? 'bg-gradient-to-r from-[#d4af37] to-[#b38b27] text-black shadow-lg'
                   : 'text-[#9e9585] hover:text-white'
               }`}
             >
-              <Users className="w-4 h-4" />
-              Deltager-Hold
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Nyt Hold</span>
             </button>
+
+            {teams.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setMode('choose')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  mode === 'choose'
+                    ? 'bg-gradient-to-r from-[#d4af37] to-[#b38b27] text-black shadow-lg'
+                    : 'text-[#9e9585] hover:text-white'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Vælg ({teams.length})</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -112,104 +154,140 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 setPinError(false);
                 setAdminPin('');
               }}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
                 mode === 'admin'
                   ? 'bg-gradient-to-r from-[#d4af37] to-[#b38b27] text-black shadow-lg'
                   : 'text-[#9e9585] hover:text-white'
               }`}
             >
-              <Crown className="w-4 h-4" />
-              Vært (Admin)
+              <Crown className="w-3.5 h-3.5" />
+              <span>Vært</span>
             </button>
           </div>
 
-          {mode === 'team' ? (
-            /* ======================================================== */
-            /* 👥 PARTICIPANT TEAM SELECTOR WITH CARDS                  */
-            /* ======================================================== */
+          {/* ======================================================== */}
+          {/* ✍️ TAB 1: OPRET NYT HOLD DYNAMISK                         */}
+          {/* ======================================================== */}
+          {mode === 'create' && (
+            <form onSubmit={handleCreateTeamSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-[#d4af37] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <PlusCircle className="w-4 h-4 text-[#d4af37]" />
+                  Skriv Jeres Holdnavn / Spillernavne
+                </label>
+                <p className="text-[11px] text-[#9e9585] mb-2.5">
+                  I kan være 1, 2 eller flere på holdet. Skriv f.eks. jeres fornavne:
+                </p>
+
+                <input
+                  type="text"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  placeholder="F.eks. Sofie & Kasper eller Hold Blodrød"
+                  required
+                  autoFocus
+                  className="w-full p-3.5 rounded-2xl bg-black/60 border border-[#d4af37]/40 text-sm font-bold text-white placeholder:text-[#9e9585]/40 focus:outline-none focus:border-[#d4af37] shadow-inner"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!newTeamName.trim() || isSubmitting}
+                className="w-full mt-2 py-3.5 rounded-2xl btn-gold text-xs sm:text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl cursor-pointer disabled:opacity-50"
+              >
+                <span>Tilmeld & Træd Ind På Slottet</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              {teams.length > 0 && (
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setMode('choose')}
+                    className="text-[11px] text-[#f6db7e] hover:underline cursor-pointer"
+                  >
+                    Er dit hold allerede oprettet? Tryk her for at logge ind &rarr;
+                  </button>
+                </div>
+              )}
+            </form>
+          )}
+
+          {/* ======================================================== */}
+          {/* 👥 TAB 2: VÆLG EKSISTERENDE TILMELDT HOLD                 */}
+          {/* ======================================================== */}
+          {mode === 'choose' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black text-[#d4af37] uppercase tracking-wider flex items-center gap-1.5">
-                  <Shield className="w-4 h-4 text-[#d4af37]" />
-                  Vælg Dit Hold (1-klik)
+                  <UserCheck className="w-4 h-4 text-[#d4af37]" />
+                  Vælg Dit Tilmeldte Hold
                 </label>
                 <span className="text-[10px] text-[#9e9585]">
-                  14 Hold på Slottet
+                  {teams.length} Tilmeldte
                 </span>
               </div>
 
-              {/* Quick Search */}
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#9e9585]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Søg efter fornavn..."
+                  placeholder="Søg i tilmeldte hold..."
                   className="w-full pl-9 pr-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder:text-[#9e9585]/50 focus:outline-none focus:border-[#d4af37]"
                 />
               </div>
 
-              {/* Scrollable Visual Card Grid of Teams */}
-              <div className="max-h-[280px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+              <div className="max-h-[260px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {filteredTeams.map((team, idx) => {
-                  const isSelected = selectedTeamId === team.id;
                   const firstNames = team.players.map(p => p.trim().split(' ')[0]).join(' & ');
 
                   return (
                     <button
                       key={team.id}
                       type="button"
-                      onClick={() => setSelectedTeamId(team.id)}
-                      className={`w-full p-3 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-[#380a10] to-[#20060a] border-[#ff3855] shadow-lg text-white scale-[1.01]'
-                          : 'bg-[#181522] border-white/10 hover:border-[#d4af37]/40 text-[#e6dfd1]'
-                      }`}
+                      onClick={() => handleSelectExistingTeam(team)}
+                      className="w-full p-3 rounded-2xl border border-white/10 bg-[#181522] hover:border-[#d4af37]/60 text-[#e6dfd1] hover:text-white transition-all flex items-center justify-between cursor-pointer"
                     >
-                      <div className="min-w-0 pr-2">
+                      <div className="min-w-0 pr-2 text-left">
                         <div className="flex items-center gap-2">
-                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${isSelected ? 'bg-[#ff3855] text-white' : 'bg-black/40 text-[#9e9585]'}`}>
+                          <span className="w-5 h-5 rounded-full bg-black/50 text-[#9e9585] text-[10px] font-black flex items-center justify-center">
                             {idx + 1}
                           </span>
                           <span className="text-xs font-black tracking-wide truncate">
-                            {firstNames}
+                            {team.name}
                           </span>
                         </div>
-                        <span className="text-[10px] text-[#9e9585] block truncate mt-0.5 ml-7">
-                          {team.name}
-                        </span>
-                      </div>
-
-                      <div className="shrink-0">
-                        {isSelected ? (
-                          <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-[#c41e3a] text-white shadow-md">
-                            Valgt ✓
+                        {team.players.length > 1 && (
+                          <span className="text-[10px] text-[#9e9585] block truncate mt-0.5 ml-7">
+                            {firstNames}
                           </span>
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-[#9e9585]/40" />
                         )}
                       </div>
+
+                      <ChevronRight className="w-4 h-4 text-[#d4af37]" />
                     </button>
                   );
                 })}
               </div>
 
-              {/* Submit Button */}
               <button
                 type="button"
-                onClick={() => handleLoginSubmit()}
-                className="w-full mt-3 py-3.5 rounded-2xl btn-gold text-xs sm:text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl cursor-pointer"
+                onClick={() => setMode('create')}
+                className="w-full py-2.5 rounded-xl bg-black/40 border border-white/10 text-xs font-bold text-[#c5bca8] hover:text-white flex items-center justify-center gap-1.5"
               >
-                <span>Træd Ind På Slottet</span>
-                <ChevronRight className="w-4 h-4" />
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Opret et andet hold</span>
               </button>
             </div>
-          ) : (
-            /* ======================================================== */
-            /* 👑 HOST (ADMIN) SELECTOR & BLANK PIN PAD                 */
-            /* ======================================================== */
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+          )}
+
+          {/* ======================================================== */}
+          {/* 👑 TAB 3: VÆRT (ADMIN) LOGIN                             */}
+          {/* ======================================================== */}
+          {mode === 'admin' && (
+            <form onSubmit={handleAdminSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-black text-[#d4af37] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <Crown className="w-4 h-4 text-[#d4af37]" />

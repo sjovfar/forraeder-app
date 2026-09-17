@@ -39,13 +39,6 @@ export const App: React.FC = () => {
       votes: {},
       isConcluded: false
     },
-    partnerSwap: {
-      isActive: false,
-      durationSeconds: 150,
-      startedAt: 0,
-      expiresAt: 0,
-      isCompleted: false
-    },
     recruitment: null,
     morningReveal: null,
     murderProposals: [],
@@ -216,7 +209,7 @@ export const App: React.FC = () => {
 
       {/* Screen Router */}
       {!session ? (
-        <LoginScreen onLogin={handleLogin} />
+        <LoginScreen teams={gameState.teams} onLogin={handleLogin} />
       ) : session.type === 'admin' ? (
         <div className="min-h-screen p-4 max-w-4xl mx-auto">
           <div className="flex items-center justify-between py-2 mb-3 border-b border-[#d4af37]/20">

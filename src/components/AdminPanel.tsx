@@ -30,7 +30,10 @@ import {
   Coffee,
   Mail,
   CheckCircle,
-  XCircle
+  XCircle,
+  PlusCircle,
+  Trash2,
+  UserPlus
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -48,6 +51,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
 
   // Morning reveal selection
   const [morningMurderTargetId, setMorningMurderTargetId] = useState<string>('auto');
+
+  // Manual team add state
+  const [manualTeamName, setManualTeamName] = useState<string>('');
+  const [showAddTeamModal, setShowAddTeamModal] = useState<boolean>(false);
+
+  // Dynamic Traitor Count State
+  const defaultTraitorCount = gameState.teams.length >= 16 ? 4 : gameState.teams.length >= 8 ? 3 : 2;
+  const [selectedTraitorCount, setSelectedTraitorCount] = useState<number>(defaultTraitorCount);
 
   // Spy chat state
   const [spyMessageInput, setSpyMessageInput] = useState('');
@@ -135,8 +146,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
   const hasPendingRecruitment = gameState.recruitment && gameState.recruitment.status === 'pending_admin';
 
   const handleRandomizeRoles = () => {
-    if (confirm('Er du sikker på, at du vil tildele 3 tilfældige Forrædere og 11 Loyale?')) {
-      socket.emit('admin:set_roles', { randomize: true });
+    if (confirm(`Er du sikker på, at du vil tildele ${selectedTraitorCount} tilfældige Forrædere og resten Loyale?`)) {
+      socket.emit('admin:set_roles', { randomize: true, traitorCount: selectedTraitorCount });
     }
   };
 
@@ -157,6 +168,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
 
   const handleToggleShield = (teamId: string) => {
     socket.emit('admin:toggle_shield', { teamId });
+  };
+
+  const handleAddTeamManual = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualTeamName.trim()) return;
+    socket.emit('team:register', { name: manualTeamName.trim() });
+    setManualTeamName('');
+    setShowAddTeamModal(false);
+  };
+
+  const handleDeleteTeam = (team: Team) => {
+    if (confirm(`Vil du slette holdet "${team.name}" fra spillet?`)) {
+      socket.emit('admin:delete_team', { teamId: team.id });
+    }
+  };
+
+  const handleClearAllTeams = () => {
+    if (confirm('ADVARSEL: Dette vil slette ALLE tilmeldte hold, så deltagerne kan oprette sig helt forfra. Er du sikker?')) {
+      socket.emit('admin:clear_all_teams');
+    }
   };
 
   const handleSendBroadcast = (e?: React.FormEvent) => {
@@ -265,7 +296,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
               Værtspanel • Julius & Karoline
             </span>
             <h1 className="text-xl font-black font-gothic text-white">
-              Slottets Kontrolrum
+              Slottets Kontrolrum ({gameState.teams.length} Hold)
             </h1>
           </div>
         </div>
@@ -335,7 +366,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>Opsætning & QR</span>
+          <span>Hold & Opsætning</span>
         </button>
       </div>
 
@@ -540,13 +571,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
 
           {/* Quick Team Status List (Alive / Dead / Shield) */}
           <div className="p-4 rounded-3xl border border-white/10 bg-[#16141e] space-y-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#f6db7e]" />
-              Holdstatus & Våbenskjold ({livingTeams.length} Levende / {deadTeams.length} Døde)
-            </h3>
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#f6db7e]" />
+                Holdstatus & Våbenskjold ({livingTeams.length} Levende / {deadTeams.length} Døde)
+              </h3>
+
+              <button
+                onClick={() => setShowAddTeamModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-[#2a2416] border border-[#d4af37]/60 text-xs font-bold text-[#f6db7e] flex items-center gap-1 cursor-pointer hover:bg-[#3d3119]"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>+ Nyt Hold</span>
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {gameState.teams.map((team) => (
+              {gameState.teams.map((team, idx) => (
                 <div
                   key={team.id}
                   className={`p-3 rounded-2xl border flex items-center justify-between gap-2 ${
@@ -555,7 +596,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                 >
                   <div className="min-w-0 pr-1">
                     <span className={`text-xs font-bold block truncate ${team.isAlive ? 'text-white' : 'text-gray-400 line-through'}`}>
-                      {team.name}
+                      {idx + 1}. {team.name}
                     </span>
                     <span className="text-[10px] text-[#9e9585]">
                       {team.role === 'traitor' ? '🗡️ Forræder' : '🛡️ Loyal'} {team.hasShield && '• (🛡️ Skjold Aktivt)'}
@@ -584,6 +625,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                       }`}
                     >
                       {team.isAlive ? 'Dræb' : 'Genopliv'}
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteTeam(team)}
+                      className="p-1 rounded-lg text-zinc-500 hover:text-red-400 transition-colors"
+                      title="Slet hold"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -638,24 +687,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
 
           {/* Role Assignments Section */}
           <div className="p-4 rounded-3xl border border-[#d4af37]/35 bg-[#15131d] space-y-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2.5">
               <div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
                   <Shield className="w-4 h-4 text-[#d4af37]" />
-                  Rolletildeling (3 Forrædere & 11 Loyale)
+                  Rolletildeling ({traitorsCount} Forrædere / {loyalsCount} Loyale)
                 </h3>
                 <p className="text-[10px] text-[#9e9585]">
-                  Status: <strong className="text-red-400">{traitorsCount} Forrædere</strong> og <strong className="text-yellow-400">{loyalsCount} Loyale</strong>
+                  Vælg antal forrædere og tryk tildel, eller klik på de enkelte hold:
                 </p>
               </div>
 
-              <button
-                onClick={handleRandomizeRoles}
-                className="px-3.5 py-2 rounded-xl btn-gold text-xs font-black uppercase tracking-wider shadow-md flex items-center gap-1.5 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                Tilfældig (1-klik)
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedTraitorCount}
+                  onChange={(e) => setSelectedTraitorCount(Number(e.target.value))}
+                  className="p-2 rounded-xl bg-black/60 border border-[#d4af37]/50 text-xs text-[#f6db7e] font-bold"
+                >
+                  <option value={1}>1 Forræder</option>
+                  <option value={2}>2 Forrædere</option>
+                  <option value={3}>3 Forrædere</option>
+                  <option value={4}>4 Forrædere</option>
+                  <option value={5}>5 Forrædere</option>
+                </select>
+
+                <button
+                  onClick={handleRandomizeRoles}
+                  className="px-3.5 py-2 rounded-xl btn-gold text-xs font-black uppercase tracking-wider shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Tildel (1-klik)
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin">
@@ -669,7 +732,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                     }`}
                   >
                     <span className="truncate pr-2 font-semibold">
-                      {idx + 1}. {team.players.map(p => p.trim().split(' ')[0]).join(' & ')}
+                      {idx + 1}. {team.name}
                     </span>
                     <button
                       onClick={() => handleToggleRole(team.id, team.role)}
@@ -864,10 +927,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       )}
 
       {/* ========================================================= */}
-      {/* ⚙️ HUB 4: SLOTTETS SETUP                                  */}
+      {/* ⚙️ HUB 4: HOLD & OPSÆTNING                                */}
       {/* ========================================================= */}
       {activeHub === 'setup' && (
         <div className="space-y-4">
+          {/* Add Team Card */}
+          <div className="p-5 rounded-3xl border border-[#d4af37]/35 bg-[#16141e] space-y-3 shadow-xl">
+            <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-[#d4af37]" />
+              Opret Hold Manuelt som Vært
+            </h3>
+
+            <form onSubmit={handleAddTeamManual} className="flex gap-2">
+              <input
+                type="text"
+                value={manualTeamName}
+                onChange={(e) => setManualTeamName(e.target.value)}
+                placeholder="Skriv holdnavn (f.eks. Mette & Frederik)..."
+                className="flex-1 p-2.5 rounded-xl bg-black/50 border border-white/10 text-xs text-white"
+              />
+              <button
+                type="submit"
+                disabled={!manualTeamName.trim()}
+                className="px-4 py-2.5 rounded-xl btn-gold text-xs font-black uppercase text-black"
+              >
+                + Opret
+              </button>
+            </form>
+          </div>
+
+          {/* QR Code Card */}
           <div className="p-6 rounded-3xl border border-[#d4af37]/35 bg-[#16141e] text-center space-y-3 shadow-xl">
             <div className="inline-block p-3 rounded-2xl bg-[#d4af37]/20 text-[#f6db7e]">
               <QrCode className="w-8 h-8" />
@@ -877,7 +966,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
               Scan & Åbn på Telefoner
             </h3>
             <p className="text-xs text-[#c5bca8] max-w-sm mx-auto">
-              Lad deltagerne scanne denne QR-kode for at åbne appen direkte på mobilen:
+              Lad deltagerne scanne denne QR-kode for at åbne appen og oprette deres hold:
             </p>
 
             {qrDataUrl && (
@@ -891,18 +980,72 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             </div>
           </div>
 
-          <div className="p-4 rounded-3xl border border-red-950 bg-[#180a0e] flex items-center justify-between gap-3">
-            <div>
-              <span className="text-xs font-black text-red-300 uppercase block">Nulstil Alt Spildata</span>
-              <span className="text-[10px] text-[#9e9585]">Sletter alle stemmer, chats og starter forfra</span>
+          {/* Danger Zone: Clear Teams & Reset */}
+          <div className="p-4 rounded-3xl border border-red-950 bg-[#180a0e] space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-black text-red-300 uppercase block">Ryd Holdlisten (0 Hold)</span>
+                <span className="text-[10px] text-[#9e9585]">Sletter alle hold, så deltagerne kan oprette sig friske</span>
+              </div>
+
+              <button
+                onClick={handleClearAllTeams}
+                className="px-3.5 py-2 rounded-xl bg-red-950 border border-red-800 text-red-300 text-xs font-black uppercase hover:bg-red-900 transition-colors"
+              >
+                Ryd Holdliste
+              </button>
             </div>
 
-            <button
-              onClick={handleResetGame}
-              className="px-4 py-2.5 rounded-xl bg-red-950 border border-red-800 text-red-300 text-xs font-black uppercase hover:bg-red-900 transition-colors"
-            >
-              Nulstil Spil
-            </button>
+            <div className="pt-2 border-t border-red-950/60 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-black text-red-300 uppercase block">Nulstil Alt Spildata</span>
+                <span className="text-[10px] text-[#9e9585]">Sletter alle stemmer, chats og starter forfra</span>
+              </div>
+
+              <button
+                onClick={handleResetGame}
+                className="px-3.5 py-2 rounded-xl bg-red-950 border border-red-800 text-red-300 text-xs font-black uppercase hover:bg-red-900 transition-colors"
+              >
+                Nulstil Spil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal to add manual team */}
+      {showAddTeamModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm p-5 rounded-3xl border border-[#d4af37] bg-[#16141e] shadow-2xl">
+            <h3 className="text-sm font-black font-gothic text-white mb-2">
+              Tilføj Nyt Hold Manuelt
+            </h3>
+            <form onSubmit={handleAddTeamManual} className="space-y-3">
+              <input
+                type="text"
+                value={manualTeamName}
+                onChange={(e) => setManualTeamName(e.target.value)}
+                placeholder="Skriv holdnavn (f.eks. Mette & Frederik)..."
+                autoFocus
+                className="w-full p-3 rounded-xl bg-black/50 border border-white/10 text-xs text-white"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTeamModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-black/50 border border-white/10 text-xs text-[#c5bca8]"
+                >
+                  Annuller
+                </button>
+                <button
+                  type="submit"
+                  disabled={!manualTeamName.trim()}
+                  className="flex-1 py-2.5 rounded-xl btn-gold text-xs font-black uppercase text-black"
+                >
+                  Opret Hold
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

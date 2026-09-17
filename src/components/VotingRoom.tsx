@@ -348,7 +348,8 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                 const isMe = currentTeam && team.id === currentTeam.id;
                 const isLeader = leaderTeamId === team.id && count > 1;
 
-                const seatR = isMe ? 22 : 18;
+                const baseSeatR = numSeats > 22 ? 12 : numSeats > 16 ? 15 : 18;
+                const seatR = isMe ? baseSeatR + 3 : baseSeatR;
 
                 return (
                   <g
@@ -414,7 +415,7 @@ export const VotingRoom: React.FC<VotingRoomProps> = ({
                           ? '#ff6b81'
                           : '#e6dfd1'
                       }
-                      fontSize={isMe ? '11' : '10'}
+                      fontSize={numSeats > 22 ? '8' : isMe ? '11' : '10'}
                       fontWeight="900"
                     >
                       {!team.isAlive ? '☠️' : isMe ? 'DIG' : `${idx + 1}`}

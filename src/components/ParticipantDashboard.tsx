@@ -3,14 +3,12 @@ import { GameState, Team, UserSession } from '../types';
 import { RoleSealModal } from './RoleSealModal';
 import { VotingRoom } from './VotingRoom';
 import { TraitorConclave } from './TraitorConclave';
-import { PartnerSwapModal } from './PartnerSwapModal';
 import { DetectiveNotesModal } from './DetectiveNotesModal';
 import {
   Shield,
   Skull,
   Users,
   Vote,
-  ArrowRightLeft,
   Eye,
   LogOut,
   Sparkles,
@@ -32,7 +30,7 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
   gameState,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'vote' | 'conclave' | 'swap'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'vote' | 'conclave'>('overview');
   const [showRoleModal, setShowRoleModal] = useState<boolean>(false);
   const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
   const [overviewFilter, setOverviewFilter] = useState<'all' | 'alive' | 'dead'>('all');
@@ -148,7 +146,7 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
             className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-[#380a10] via-[#520d17] to-[#380a10] border-2 border-[#ff3855] text-white flex items-center justify-between shadow-xl animate-pulse-intense cursor-pointer"
           >
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-[#c41e3a] text-white shadow-md">
+              <div className="p-2.5 rounded-xl bg-[#c41e3a] text-white shadow-md">
                 <Vote className="w-5 h-5" />
               </div>
               <div className="text-left">
@@ -157,24 +155,6 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
               </div>
             </div>
             <span className="text-xs font-black text-[#f6db7e] bg-black/40 px-2.5 py-1 rounded-lg">Gå til &rarr;</span>
-          </button>
-        )}
-
-        {gameState.partnerSwap.isActive && !gameState.partnerSwap.winnerTeamId && activeTab !== 'swap' && (
-          <button
-            onClick={() => setActiveTab('swap')}
-            className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-[#2a2416] via-[#4a3b16] to-[#2a2416] border-2 border-[#d4af37] text-white flex items-center justify-between shadow-xl animate-pulse-intense cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-[#d4af37] text-black shadow-md">
-                <ArrowRightLeft className="w-5 h-5" />
-              </div>
-              <div className="text-left">
-                <span className="text-xs font-black block text-[#f6db7e]">PARTNERBYTTE AKTIVERET!</span>
-                <span className="text-[10px] text-[#e6dfd1]">Tiden rinder ud – Først på knappen vinder</span>
-              </div>
-            </div>
-            <span className="text-xs font-black text-black bg-[#d4af37] px-2.5 py-1 rounded-lg">Tryk her &rarr;</span>
           </button>
         )}
 
@@ -243,7 +223,7 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
                       <div className="min-w-0 pr-2">
                         <div className="flex items-center gap-1.5">
                           <span className={`text-xs font-black truncate ${team.isAlive ? 'text-white' : 'text-gray-400 line-through'}`}>
-                            {firstNames}
+                            {idx + 1}. {team.name}
                           </span>
                           {isMe && (
                             <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#d4af37] text-black">
@@ -256,9 +236,11 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-[#9e9585] block truncate mt-0.5">
-                          {team.name}
-                        </span>
+                        {team.players.length > 1 && (
+                          <span className="text-[10px] text-[#9e9585] block truncate mt-0.5 ml-4">
+                            {firstNames}
+                          </span>
+                        )}
                       </div>
 
                       <div className="shrink-0 text-right">
@@ -321,15 +303,6 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
             </div>
           )
         )}
-
-        {/* TAB: PARTNER SWAP */}
-        {activeTab === 'swap' && (
-          <PartnerSwapModal
-            partnerSwap={gameState.partnerSwap}
-            currentTeam={currentTeam}
-            isAdmin={false}
-          />
-        )}
       </div>
 
       {/* Bottom Fixed Navigation Bar */}
@@ -337,7 +310,7 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
         <div className="max-w-md mx-auto flex items-center justify-around">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl transition-all cursor-pointer ${
               activeTab === 'overview' ? 'text-[#d4af37]' : 'text-[#9e9585] hover:text-[#e6dfd1]'
             }`}
           >
@@ -347,42 +320,29 @@ export const ParticipantDashboard: React.FC<ParticipantDashboardProps> = ({
 
           <button
             onClick={() => setActiveTab('vote')}
-            className={`relative flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            className={`relative flex flex-col items-center gap-1 py-1 px-4 rounded-xl transition-all cursor-pointer ${
               activeTab === 'vote' ? 'text-[#d4af37]' : 'text-[#9e9585] hover:text-[#e6dfd1]'
             }`}
           >
             <Vote className="w-5 h-5" />
             <span className="text-[10px] font-bold uppercase tracking-wider">Rundbord</span>
             {gameState.voteSession.isActive && (
-              <span className="absolute top-1 right-2 w-2.5 h-2.5 rounded-full bg-[#ff3855] animate-ping" />
+              <span className="absolute top-1 right-3 w-2.5 h-2.5 rounded-full bg-[#ff3855] animate-ping" />
             )}
           </button>
 
           {isTraitor && (
             <button
               onClick={() => setActiveTab('conclave')}
-              className={`relative flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              className={`relative flex flex-col items-center gap-1 py-1 px-4 rounded-xl transition-all cursor-pointer ${
                 activeTab === 'conclave' ? 'text-[#ff3855]' : 'text-[#9e9585] hover:text-[#ff8095]'
               }`}
             >
               <Skull className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Mordstue</span>
-              <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-[#ff3855]" />
+              <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-[#ff3855]" />
             </button>
           )}
-
-          <button
-            onClick={() => setActiveTab('swap')}
-            className={`relative flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'swap' ? 'text-[#d4af37]' : 'text-[#9e9585] hover:text-[#e6dfd1]'
-            }`}
-          >
-            <ArrowRightLeft className="w-5 h-5" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Partnerbytte</span>
-            {gameState.partnerSwap.isActive && !gameState.partnerSwap.winnerTeamId && (
-              <span className="absolute top-1 right-2 w-2.5 h-2.5 rounded-full bg-[#f6db7e] animate-ping" />
-            )}
-          </button>
         </div>
       </div>
     </div>

@@ -14,7 +14,10 @@ import {
   ChatMessage, 
   BroadcastEvent,
   RoleType,
-  EliminationReason
+  EliminationReason,
+  SoundType,
+  RecruitmentSession,
+  MorningRevealSession
 } from '../src/types.js';
 
 const app = express();
@@ -31,7 +34,6 @@ const io = new SocketIOServer(server, {
 
 const DB_FILE = path.join(process.cwd(), 'gamestate.json');
 
-// Helper to get local network IP address
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
@@ -49,7 +51,6 @@ function getLocalIpAddress(): string {
 
 const localIp = getLocalIpAddress();
 
-// Initial state generator
 function createDefaultState(): GameState {
   const teams: Team[] = INITIAL_TEAMS.map((t) => ({
     id: t.id,
@@ -57,6 +58,7 @@ function createDefaultState(): GameState {
     players: t.players,
     role: 'unassigned',
     isAlive: true,
+    hasShield: false,
     roleRevealed: false
   }));
 
@@ -70,20 +72,15 @@ function createDefaultState(): GameState {
       votes: {},
       isConcluded: false
     },
-    partnerSwap: {
-      isActive: false,
-      durationSeconds: 150, // 2.5 minutes
-      startedAt: 0,
-      expiresAt: 0,
-      isCompleted: false
-    },
+    recruitment: null,
+    morningReveal: null,
     murderProposals: [],
     traitorChat: [
       {
         id: 'msg-init',
         senderId: 'system',
         senderName: 'Slottets Tavshed',
-        text: 'Forrædernes konklave er åben. Her planlægges nattens ugerninger i hemmelighed.',
+        text: 'Forrædernes konklave er åben. Her planlægges nattens ugerninger og rekruttering i hemmelighed.',
         timestamp: Date.now(),
         isSystem: true
       }
@@ -94,13 +91,20 @@ function createDefaultState(): GameState {
   };
 }
 
-// Load or initialize state
 let gameState: GameState = createDefaultState();
 
 try {
   if (fs.existsSync(DB_FILE)) {
     const data = fs.readFileSync(DB_FILE, 'utf-8');
-    gameState = JSON.parse(data);
+    const loaded = JSON.parse(data);
+    gameState = {
+      ...createDefaultState(),
+      ...loaded,
+      teams: (loaded.teams || []).map((t: Team) => ({
+        ...t,
+        hasShield: !!t.hasShield
+      }))
+    };
     console.log('🏰 Game state loaded successfully from disk.');
   } else {
     saveState();
@@ -137,7 +141,7 @@ app.get('/api/state', (_req, res) => {
   res.json(gameState);
 });
 
-// Serve frontend static build if dist directory exists (Express 5 compatible SPA fallback)
+// Serve frontend static build if dist directory exists
 const distPath = path.join(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -153,12 +157,235 @@ if (fs.existsSync(distPath)) {
 io.on('connection', (socket: Socket) => {
   socket.emit('state_update', gameState);
 
-  // 1. ADMIN: Assign Roles
-  socket.on('admin:set_roles', (data: { assignments?: Record<string, RoleType>; randomize?: boolean }) => {
+  socket.on('admin:play_sound', (data: { soundType: SoundType }) => {
+    io.emit('trigger_sound', { soundType: data.soundType });
+  });
+
+  socket.on('admin:force_logout_all', () => {
+    console.log('🚨 Admin triggered FORCE LOGOUT on all connected clients.');
+    io.emit('force_logout', { message: 'Slottets Værter har nulstillet alle login-sessioner.' });
+  });
+
+  // 1. DYNAMIC TEAM REGISTRATION
+  socket.on('team:register', (data: { name: string; players?: string[] }, callback?: (res: { success: boolean; team: Team }) => void) => {
+    const trimmedName = (data.name || '').trim();
+    if (!trimmedName) return;
+
+    // Check if team already exists (case-insensitive)
+    const existing = gameState.teams.find(t => t.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      if (callback) callback({ success: true, team: existing });
+      return;
+    }
+
+    const parsedPlayers = data.players && data.players.length > 0 
+      ? data.players 
+      : trimmedName.includes('/') 
+      ? trimmedName.split('/').map(p => p.trim()).filter(Boolean)
+      : trimmedName.includes('&')
+      ? trimmedName.split('&').map(p => p.trim()).filter(Boolean)
+      : [trimmedName];
+
+    const newTeam: Team = {
+      id: `team-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name: trimmedName,
+      players: parsedPlayers,
+      role: 'unassigned',
+      isAlive: true,
+      hasShield: false,
+      roleRevealed: false
+    };
+
+    gameState.teams.push(newTeam);
+    broadcastState();
+
+    if (callback) {
+      callback({ success: true, team: newTeam });
+    }
+  });
+
+  // ADMIN: Delete a team
+  socket.on('admin:delete_team', (data: { teamId: string }) => {
+    gameState.teams = gameState.teams.filter(t => t.id !== data.teamId);
+    broadcastState();
+  });
+
+  // ADMIN: Clear all teams to start completely fresh
+  socket.on('admin:clear_all_teams', () => {
+    gameState.teams = [];
+    broadcastState();
+  });
+
+  // 2. ADMIN: Toggle Shield on Team
+  socket.on('admin:toggle_shield', (data: { teamId: string; hasShield?: boolean }) => {
+    gameState.teams = gameState.teams.map(t => {
+      if (t.id === data.teamId) {
+        const nextShield = data.hasShield !== undefined ? data.hasShield : !t.hasShield;
+        return { ...t, hasShield: nextShield };
+      }
+      return t;
+    });
+    io.emit('trigger_sound', { soundType: 'shield' });
+    broadcastState();
+  });
+
+  // 3. ADMIN: Morning Reveal Sequence
+  socket.on('admin:start_morning_reveal', (data?: { murderedTeamId?: string; noMurder?: boolean }) => {
+    let murderedId = data?.murderedTeamId;
+    let murderedName: string | undefined = undefined;
+    let isNoMurder = data?.noMurder || false;
+
+    if (murderedId) {
+      const team = gameState.teams.find(t => t.id === murderedId);
+      if (team) {
+        murderedName = team.name;
+        team.isAlive = false;
+        team.eliminationReason = 'murder';
+        team.eliminatedAt = team.eliminatedAt || Date.now();
+      }
+    } else if (!isNoMurder) {
+      const deadMurders = gameState.teams.filter(t => !t.isAlive && t.eliminationReason === 'murder');
+      if (deadMurders.length > 0) {
+        const latest = deadMurders[deadMurders.length - 1];
+        murderedId = latest.id;
+        murderedName = latest.name;
+      } else {
+        isNoMurder = true;
+      }
+    }
+
+    const living = gameState.teams.filter(t => t.isAlive).map(t => t.id);
+
+    gameState.morningReveal = {
+      isActive: true,
+      murderedTeamId: murderedId,
+      murderedTeamName: murderedName,
+      noMurder: isNoMurder,
+      revealedTeamIds: living,
+      timestamp: Date.now(),
+      isConcluded: false
+    };
+
+    io.emit('trigger_sound', { soundType: 'bell' });
+    broadcastState();
+  });
+
+  socket.on('admin:end_morning_reveal', () => {
+    gameState.morningReveal = null;
+    broadcastState();
+  });
+
+  // 4. RECRUITMENT: Propose (Traitors) -> Approve/Reject (Host) -> Respond (Target Team)
+  socket.on('traitor:propose_recruitment', (data: { targetTeamId: string }) => {
+    const target = gameState.teams.find(t => t.id === data.targetTeamId);
+    if (!target || !target.isAlive) return;
+
+    gameState.recruitment = {
+      id: `rec-${Date.now()}`,
+      isActive: false,
+      targetTeamId: target.id,
+      targetTeamName: target.name,
+      proposedByTeamName: 'Forræder-Konklavet',
+      status: 'pending_admin',
+      timestamp: Date.now()
+    };
+
+    gameState.traitorChat.push({
+      id: `rec-prop-${Date.now()}`,
+      senderId: 'system',
+      senderName: 'Forræder-Mødet',
+      text: `💌 Forræderne har anmodet værterne om at sende et rekrutterings-brev til ${target.name}. Venter på værternes godkendelse...`,
+      timestamp: Date.now(),
+      isSystem: true
+    });
+
+    broadcastState();
+  });
+
+  socket.on('admin:handle_recruitment_proposal', (data: { action: 'approved' | 'rejected' }) => {
+    if (!gameState.recruitment) return;
+
+    if (data.action === 'approved') {
+      gameState.recruitment.status = 'dispatched';
+      gameState.recruitment.isActive = true;
+
+      gameState.traitorChat.push({
+        id: `rec-app-${Date.now()}`,
+        senderId: 'system',
+        senderName: 'Slottets Værter',
+        text: `👑 Værterne har GODKENDT rekrutteringen! Pergamentbrevet er blevet leveret til ${gameState.recruitment.targetTeamName} i natten.`,
+        timestamp: Date.now(),
+        isSystem: true
+      });
+
+      io.emit('trigger_sound', { soundType: 'whisper' });
+    } else {
+      gameState.recruitment.status = 'rejected_by_admin';
+      gameState.recruitment.isActive = false;
+
+      gameState.traitorChat.push({
+        id: `rec-rej-${Date.now()}`,
+        senderId: 'system',
+        senderName: 'Slottets Værter',
+        text: `🛡️ Værterne AFVISTE rekrutteringen af ${gameState.recruitment.targetTeamName}.`,
+        timestamp: Date.now(),
+        isSystem: true
+      });
+    }
+
+    broadcastState();
+  });
+
+  socket.on('team:respond_recruitment', (data: { teamId: string; accept: boolean }) => {
+    if (!gameState.recruitment || gameState.recruitment.targetTeamId !== data.teamId) return;
+
+    if (data.accept) {
+      gameState.recruitment.status = 'accepted';
+      gameState.recruitment.isActive = false;
+
+      gameState.teams = gameState.teams.map(t => {
+        if (t.id === data.teamId) {
+          return { ...t, role: 'traitor' };
+        }
+        return t;
+      });
+
+      gameState.traitorChat.push({
+        id: `rec-acc-${Date.now()}`,
+        senderId: 'system',
+        senderName: 'Slottets Tavshed',
+        text: `🩸 ${gameState.recruitment.targetTeamName} har ACCEPTERET og er nu optaget som FORRÆDER! Byd jeres nye allierede velkommen.`,
+        timestamp: Date.now(),
+        isSystem: true
+      });
+
+      io.emit('trigger_sound', { soundType: 'knife' });
+    } else {
+      gameState.recruitment.status = 'rejected';
+      gameState.recruitment.isActive = false;
+
+      gameState.traitorChat.push({
+        id: `rec-rej-${Date.now()}`,
+        senderId: 'system',
+        senderName: 'Slottets Tavshed',
+        text: `🛡️ ${gameState.recruitment.targetTeamName} har AFVIST rekrutteringen og forbliver loyal.`,
+        timestamp: Date.now(),
+        isSystem: true
+      });
+    }
+
+    broadcastState();
+  });
+
+  // 5. ADMIN: Set Roles
+  socket.on('admin:set_roles', (data: { assignments?: Record<string, RoleType>; randomize?: boolean; traitorCount?: number }) => {
     if (data.randomize) {
       const teamIds = gameState.teams.map(t => t.id);
+      const totalTeams = teamIds.length;
+      const count = data.traitorCount || (totalTeams >= 16 ? 4 : totalTeams >= 8 ? 3 : 2);
+
       const shuffled = [...teamIds].sort(() => 0.5 - Math.random());
-      const traitorIds = new Set(shuffled.slice(0, 3));
+      const traitorIds = new Set(shuffled.slice(0, count));
 
       gameState.teams = gameState.teams.map(t => ({
         ...t,
@@ -174,12 +401,13 @@ io.on('connection', (socket: Socket) => {
     broadcastState();
   });
 
-  // 2. ADMIN: Set Team Status
+  // 6. ADMIN: Set Team Status
   socket.on('admin:set_status', (data: { 
     teamId: string; 
     isAlive: boolean; 
     reason?: EliminationReason; 
     roleRevealed?: boolean;
+    hasShield?: boolean;
     customPlayerNames?: string[];
   }) => {
     gameState.teams = gameState.teams.map(t => {
@@ -187,6 +415,7 @@ io.on('connection', (socket: Socket) => {
         return {
           ...t,
           isAlive: data.isAlive,
+          hasShield: data.hasShield !== undefined ? data.hasShield : t.hasShield,
           eliminatedAt: !data.isAlive ? (t.eliminatedAt || Date.now()) : undefined,
           eliminationReason: !data.isAlive ? (data.reason || 'manual') : undefined,
           roleRevealed: data.roleRevealed !== undefined ? data.roleRevealed : t.roleRevealed,
@@ -199,7 +428,7 @@ io.on('connection', (socket: Socket) => {
     broadcastState();
   });
 
-  // 3. ADMIN: Broadcast Alert
+  // 7. ADMIN: Broadcast Alert
   socket.on('admin:broadcast', (data: { title: string; message: string; soundType: any; sender?: string }) => {
     const broadcastEvent: BroadcastEvent = {
       id: `bc-${Date.now()}`,
@@ -218,7 +447,7 @@ io.on('connection', (socket: Socket) => {
     broadcastState();
   });
 
-  // 4. ADMIN & VOTING
+  // 8. ADMIN & VOTING
   socket.on('admin:start_vote', (data: { title?: string; roundNumber?: number }) => {
     gameState.voteSession = {
       isActive: true,
@@ -305,74 +534,7 @@ io.on('connection', (socket: Socket) => {
     broadcastState();
   });
 
-  // 5. PARTNER SWAP
-  socket.on('admin:start_partner_swap', (data: { durationSeconds?: number }) => {
-    const duration = data?.durationSeconds || 150;
-    const now = Date.now();
-    gameState.partnerSwap = {
-      isActive: true,
-      durationSeconds: duration,
-      startedAt: now,
-      expiresAt: now + duration * 1000,
-      winnerTeamId: undefined,
-      winnerTeamName: undefined,
-      winnerTimestamp: undefined,
-      isCompleted: false
-    };
-    broadcastState();
-  });
-
-  socket.on('partner_swap:claim', (data: { teamId: string; teamName: string }) => {
-    if (!gameState.partnerSwap.isActive) return;
-    if (gameState.partnerSwap.winnerTeamId) return;
-
-    const team = gameState.teams.find(t => t.id === data.teamId);
-    if (!team || !team.isAlive) return;
-
-    if (Date.now() > gameState.partnerSwap.expiresAt) return;
-
-    gameState.partnerSwap.winnerTeamId = data.teamId;
-    gameState.partnerSwap.winnerTeamName = data.teamName;
-    gameState.partnerSwap.winnerTimestamp = Date.now();
-    gameState.partnerSwap.isActive = false;
-    broadcastState();
-  });
-
-  socket.on('admin:confirm_partner_swap', (data: {
-    winningTeamId: string;
-    playerToReplace: string;
-    newPlayerName: string;
-    fromDeadTeamName: string;
-  }) => {
-    const team = gameState.teams.find(t => t.id === data.winningTeamId);
-    if (team) {
-      const newPlayers = team.players.map(p => p === data.playerToReplace ? data.newPlayerName : p);
-      team.players = newPlayers;
-      team.name = newPlayers.join(' / ');
-      
-      gameState.partnerSwap.isCompleted = true;
-      gameState.partnerSwap.swappedDetails = {
-        teamId: data.winningTeamId,
-        originalPlayer: data.playerToReplace,
-        newPlayer: data.newPlayerName,
-        fromDeadTeamName: data.fromDeadTeamName
-      };
-    }
-    broadcastState();
-  });
-
-  socket.on('admin:reset_partner_swap', () => {
-    gameState.partnerSwap = {
-      isActive: false,
-      durationSeconds: 150,
-      startedAt: 0,
-      expiresAt: 0,
-      isCompleted: false
-    };
-    broadcastState();
-  });
-
-  // 6. TRAITOR CONCLAVE
+  // 9. TRAITOR CONCLAVE & MURDER (WITH SHIELD PROTECTION)
   socket.on('traitor:send_message', (data: { senderId: string; senderName: string; text: string }) => {
     const msg: ChatMessage = {
       id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -402,7 +564,7 @@ io.on('connection', (socket: Socket) => {
       id: `sys-${Date.now()}`,
       senderId: 'system',
       senderName: 'Forræder-Mødet',
-      text: `🗡️ ${data.proposedByTeamName} har udpeget ${data.targetTeamName} til eliminering! Venter på værternes eksekvering.`,
+      text: `🗡️ ${data.proposedByTeamName} har udpeget ${data.targetTeamName} til nattens mord. Venter på værternes godkendelse...`,
       timestamp: Date.now(),
       isSystem: true
     });
@@ -414,31 +576,49 @@ io.on('connection', (socket: Socket) => {
     const proposal = gameState.murderProposals.find(p => p.id === data.proposalId);
     if (!proposal) return;
 
-    proposal.status = data.action;
-
     if (data.action === 'approved') {
-      gameState.teams = gameState.teams.map(t => {
-        if (t.id === proposal.targetTeamId) {
-          return {
-            ...t,
-            isAlive: false,
-            eliminatedAt: Date.now(),
-            eliminationReason: 'murder',
-            roleRevealed: false
-          };
-        }
-        return t;
-      });
+      const targetTeam = gameState.teams.find(t => t.id === proposal.targetTeamId);
 
-      gameState.traitorChat.push({
-        id: `sys-${Date.now()}`,
-        senderId: 'system',
-        senderName: 'Slottets Værter',
-        text: `☠️ Mordet på ${proposal.targetTeamName} er blevet godkendt og effektueret af værterne!`,
-        timestamp: Date.now(),
-        isSystem: true
-      });
+      if (targetTeam && targetTeam.hasShield) {
+        proposal.status = 'blocked_by_shield';
+        targetTeam.hasShield = false;
+
+        gameState.traitorChat.push({
+          id: `sys-${Date.now()}`,
+          senderId: 'system',
+          senderName: 'Slottets Skjold',
+          text: `🛡️ MORDET FEJLEDE! ${proposal.targetTeamName} bar slottets våbenskjold og overlevede nattens angreb!`,
+          timestamp: Date.now(),
+          isSystem: true
+        });
+
+        io.emit('trigger_sound', { soundType: 'shield' });
+      } else {
+        proposal.status = 'approved';
+        gameState.teams = gameState.teams.map(t => {
+          if (t.id === proposal.targetTeamId) {
+            return {
+              ...t,
+              isAlive: false,
+              eliminatedAt: Date.now(),
+              eliminationReason: 'murder',
+              roleRevealed: false
+            };
+          }
+          return t;
+        });
+
+        gameState.traitorChat.push({
+          id: `sys-${Date.now()}`,
+          senderId: 'system',
+          senderName: 'Slottets Værter',
+          text: `☠️ Mordet på ${proposal.targetTeamName} er blevet godkendt og effektueret af værterne!`,
+          timestamp: Date.now(),
+          isSystem: true
+        });
+      }
     } else {
+      proposal.status = 'rejected';
       gameState.traitorChat.push({
         id: `sys-${Date.now()}`,
         senderId: 'system',
@@ -452,7 +632,7 @@ io.on('connection', (socket: Socket) => {
     broadcastState();
   });
 
-  // 7. ADMIN: Reset
+  // 10. ADMIN: Reset Game
   socket.on('admin:reset_game', () => {
     gameState = createDefaultState();
     broadcastState();

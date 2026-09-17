@@ -18,14 +18,25 @@
   body {
     background-color: #09080c;
     color: var(--parchment);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* Prevent iOS Safari automatic zoom on focus when font-size is < 16px */
+  @media screen and (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
   }
 
   h1, h2, h3, h4, .font-gothic {
     font-family: 'Cinzel', serif;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
   }
 
   .font-gothic-dec {
@@ -36,25 +47,26 @@
 /* Custom Castle UI Utilities & Animations */
 
 .castle-gradient-bg {
-  background: radial-gradient(circle at 50% 0%, #29080e 0%, #120d15 45%, #08070a 100%);
+  background: radial-gradient(circle at 50% 0%, #2a080f 0%, #120d15 45%, #08070a 100%);
+  min-height: 100vh;
 }
 
 .castle-card {
-  background: linear-gradient(180deg, rgba(28, 25, 36, 0.85) 0%, rgba(16, 14, 22, 0.95) 100%);
-  border: 1px solid rgba(212, 175, 55, 0.22);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(28, 25, 36, 0.88) 0%, rgba(16, 14, 22, 0.96) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .castle-card-traitor {
-  background: linear-gradient(180deg, rgba(46, 10, 16, 0.9) 0%, rgba(20, 6, 9, 0.98) 100%);
-  border: 1px solid rgba(196, 30, 58, 0.4);
-  box-shadow: 0 10px 30px -10px rgba(196, 30, 58, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(46, 10, 16, 0.92) 0%, rgba(20, 6, 9, 0.98) 100%);
+  border: 1px solid rgba(196, 30, 58, 0.45);
+  box-shadow: 0 10px 30px -10px rgba(196, 30, 58, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .castle-card-loyal {
-  background: linear-gradient(180deg, rgba(32, 28, 20, 0.9) 0%, rgba(14, 13, 10, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(32, 28, 20, 0.92) 0%, rgba(14, 13, 10, 0.98) 100%);
   border: 1px solid rgba(212, 175, 55, 0.45);
-  box-shadow: 0 10px 30px -10px rgba(212, 175, 55, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(212, 175, 55, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .gold-glow {
@@ -77,10 +89,11 @@
 .btn-gold {
   background: linear-gradient(180deg, #d4af37 0%, #997a15 100%);
   color: #0b0a08;
-  font-weight: 700;
+  font-weight: 800;
   border: 1px solid #f6db7e;
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: manipulation;
 }
 
 .btn-gold:active {
@@ -91,10 +104,11 @@
 .btn-crimson {
   background: linear-gradient(180deg, #b81428 0%, #570a13 100%);
   color: #fce8e8;
-  font-weight: 700;
+  font-weight: 800;
   border: 1px solid #e63946;
   box-shadow: 0 4px 15px rgba(184, 20, 40, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: manipulation;
 }
 
 .btn-crimson:active {
@@ -105,9 +119,10 @@
 .btn-dark {
   background: linear-gradient(180deg, #22202b 0%, #121118 100%);
   color: #d6cfbe;
-  border: 1px solid rgba(212, 175, 55, 0.2);
+  border: 1px solid rgba(212, 175, 55, 0.25);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
   transition: all 0.2s ease;
+  touch-action: manipulation;
 }
 
 .btn-dark:active {
@@ -121,8 +136,8 @@
     box-shadow: 0 0 20px rgba(196, 30, 58, 0.4);
   }
   50% {
-    transform: scale(1.03);
-    box-shadow: 0 0 45px rgba(196, 30, 58, 0.85);
+    transform: scale(1.02);
+    box-shadow: 0 0 40px rgba(196, 30, 58, 0.85);
   }
 }
 
@@ -131,10 +146,10 @@
 }
 
 @keyframes candle-flicker {
-  0%, 100% { opacity: 0.9; }
-  25% { opacity: 0.75; }
+  0%, 100% { opacity: 0.92; }
+  25% { opacity: 0.78; }
   50% { opacity: 1; }
-  75% { opacity: 0.82; }
+  75% { opacity: 0.85; }
 }
 
 .animate-flicker {
@@ -143,8 +158,8 @@
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: rgba(10, 9, 13, 0.8);
@@ -157,10 +172,10 @@
   background: rgba(212, 175, 55, 0.6);
 }
 
-/* Safe area padding for mobile notches */
+/* Safe area padding for mobile notches and home bars */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 16px);
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 16px);
+  padding-top: max(16px, env(safe-area-inset-top));
 }

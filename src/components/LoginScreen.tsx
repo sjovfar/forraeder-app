@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Team, ADMIN_USERS, UserSession } from '../types';
 import { socket } from '../socket';
 import { soundEngine } from '../soundEngine';
-import { Shield, Lock, Crown, Users, ChevronRight, Search, PlusCircle, UserCheck } from 'lucide-react';
+import { Shield, Lock, Crown, Users, ChevronRight, Search, PlusCircle, UserCheck, Eye, EyeOff } from 'lucide-react';
 
 interface LoginScreenProps {
   teams?: Team[];
@@ -15,6 +15,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
   const [newTeamName, setNewTeamName] = useState<string>('');
   const [selectedAdminId, setSelectedAdminId] = useState<string>(ADMIN_USERS[0]?.id || 'admin-julius');
   const [adminPin, setAdminPin] = useState<string>('');
+  const [showPin, setShowPin] = useState<boolean>(false);
   const [pinError, setPinError] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -47,7 +48,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
       }
     });
 
-    // Fallback if no callback within 800ms
     setTimeout(() => {
       setIsSubmitting(false);
     }, 1200);
@@ -69,7 +69,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
   // 3. Admin Login
   const handleAdminSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPin.trim() !== '2026') {
+    const cleanedPin = adminPin.trim();
+
+    if (cleanedPin !== '2026') {
       setPinError(true);
       soundEngine.playTick();
       if ('vibrate' in navigator) {
@@ -90,18 +92,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between p-4 sm:p-6 castle-gradient-bg animate-fade-in relative overflow-hidden">
+    <div className="min-h-screen flex flex-col justify-between p-3.5 sm:p-6 castle-gradient-bg animate-fade-in relative overflow-hidden">
       {/* Background ambient lighting */}
       <div className="absolute top-6 left-1/2 -translate-x-1/2 w-80 h-80 bg-[#8c1424]/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-6 left-10 w-60 h-60 bg-[#d4af37]/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Castle Header */}
-      <div className="text-center pt-4 pb-2 relative z-10">
-        <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full wax-seal mb-2 sm:mb-3 shadow-2xl animate-flicker">
-          <span className="text-2xl sm:text-3xl filter drop-shadow">🗡️</span>
+      <div className="text-center pt-3 sm:pt-4 pb-2 relative z-10">
+        <div className="inline-flex items-center justify-center w-14 h-14 sm:w-20 sm:h-20 rounded-full wax-seal mb-2 shadow-2xl animate-flicker">
+          <span className="text-xl sm:text-3xl filter drop-shadow">🗡️</span>
         </div>
 
-        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.3em] text-[#d4af37] block mb-1">
+        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.25em] text-[#d4af37] block mb-0.5">
           Det Store Reality-Spil
         </span>
 
@@ -169,13 +171,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
           {/* ✍️ TAB 1: OPRET NYT HOLD DYNAMISK                         */}
           {/* ======================================================== */}
           {mode === 'create' && (
-            <form onSubmit={handleCreateTeamSubmit} className="space-y-4">
+            <form onSubmit={handleCreateTeamSubmit} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-black text-[#d4af37] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                   <PlusCircle className="w-4 h-4 text-[#d4af37]" />
                   Skriv Jeres Holdnavn / Spillernavne
                 </label>
-                <p className="text-[11px] text-[#9e9585] mb-2.5">
+                <p className="text-[11px] text-[#9e9585] mb-2">
                   I kan være 1, 2 eller flere på holdet. Skriv f.eks. jeres fornavne:
                 </p>
 
@@ -183,10 +185,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
                   type="text"
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
-                  placeholder="F.eks. Sofie & Kasper eller Hold Blodrød"
+                  placeholder="F.eks. Sofie & Kasper eller Hold Rød"
                   required
                   autoFocus
-                  className="w-full p-3.5 rounded-2xl bg-black/60 border border-[#d4af37]/40 text-sm font-bold text-white placeholder:text-[#9e9585]/40 focus:outline-none focus:border-[#d4af37] shadow-inner"
+                  className="w-full p-3.5 rounded-2xl bg-black/60 border border-[#d4af37]/40 text-sm sm:text-base font-bold text-white placeholder:text-[#9e9585]/40 focus:outline-none focus:border-[#d4af37] shadow-inner"
                 />
               </div>
 
@@ -275,7 +277,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
               <button
                 type="button"
                 onClick={() => setMode('create')}
-                className="w-full py-2.5 rounded-xl bg-black/40 border border-white/10 text-xs font-bold text-[#c5bca8] hover:text-white flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 rounded-xl bg-black/40 border border-white/10 text-xs font-bold text-[#c5bca8] hover:text-white flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
                 <span>Opret et andet hold</span>
@@ -315,25 +317,39 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin })
               </div>
 
               <div>
-                <label className="block text-xs font-black text-[#c5bca8] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Lock className="w-4 h-4 text-[#d4af37]" />
-                  Hemmelig Vært-PIN
+                <label className="block text-xs font-black text-[#c5bca8] uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Lock className="w-4 h-4 text-[#d4af37]" />
+                    Hemmelig Vært-PIN
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="text-[10px] text-[#f6db7e] flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    {showPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <span>{showPin ? 'Skjul' : 'Vis kode'}</span>
+                  </button>
                 </label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={10}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  value={adminPin}
-                  onChange={(e) => {
-                    setAdminPin(e.target.value);
-                    setPinError(false);
-                  }}
-                  placeholder=""
-                  className="w-full p-3.5 rounded-2xl bg-black/60 border border-white/10 text-center tracking-[0.4em] text-base font-black text-white focus:outline-none focus:border-[#d4af37]"
-                />
+
+                <div className="relative">
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    maxLength={10}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={adminPin}
+                    onChange={(e) => {
+                      setAdminPin(e.target.value);
+                      setPinError(false);
+                    }}
+                    placeholder="Indtast 4 cifre..."
+                    className="w-full p-3.5 rounded-2xl bg-black/60 border border-white/15 text-center tracking-[0.3em] text-lg font-black text-white focus:outline-none focus:border-[#d4af37] shadow-inner"
+                  />
+                </div>
+
                 {pinError && (
                   <p className="text-[11px] text-[#ff6b81] mt-1.5 font-bold text-center animate-shake">
                     Forkert PIN-kode. Adgang nægtet.

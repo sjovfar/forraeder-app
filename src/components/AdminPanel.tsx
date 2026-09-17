@@ -9,7 +9,6 @@ import {
   Skull,
   Radio,
   Vote,
-  ArrowRightLeft,
   QrCode,
   RotateCcw,
   Sparkles,
@@ -57,7 +56,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
   const [showAddTeamModal, setShowAddTeamModal] = useState<boolean>(false);
 
   // Dynamic Traitor Count State
-  const defaultTraitorCount = gameState.teams.length >= 16 ? 4 : gameState.teams.length >= 8 ? 3 : 2;
+  const totalTeamsCount = (gameState.teams || []).length;
+  const defaultTraitorCount = totalTeamsCount >= 16 ? 4 : totalTeamsCount >= 8 ? 3 : 2;
   const [selectedTraitorCount, setSelectedTraitorCount] = useState<number>(defaultTraitorCount);
 
   // Spy chat state
@@ -65,14 +65,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
   const spyChatBottomRef = useRef<HTMLDivElement>(null);
 
   // Voting state
-  const [voteTitle, setVoteTitle] = useState(`Rundbordssamling #${gameState.voteSession.roundNumber}`);
+  const [voteTitle, setVoteTitle] = useState(`Rundbordssamling #${gameState.voteSession?.roundNumber || 1}`);
   const [eliminateHighest, setEliminateHighest] = useState(true);
   const [manualEliminateId, setManualEliminateId] = useState('');
-
-  // Partner swap state
-  const [swapPlayerToReplace, setSwapPlayerToReplace] = useState('');
-  const [swapNewPlayerName, setSwapNewPlayerName] = useState('');
-  const [swapFromDeadTeam, setSwapFromDeadTeam] = useState('');
 
   // QR code state
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
@@ -100,7 +95,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
     if (activeHub === 'traitors') {
       spyChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [gameState.traitorChat.length, activeHub]);
+  }, [gameState.traitorChat?.length, activeHub]);
 
   // Quick broadcast templates
   const broadcastTemplates = [
@@ -138,11 +133,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
     { label: 'Våbenskjold', sound: 'shield', icon: '🛡️', desc: 'Tung gylden klokkeklang' },
   ];
 
-  const traitorsCount = gameState.teams.filter(t => t.role === 'traitor').length;
-  const loyalsCount = gameState.teams.filter(t => t.role === 'loyal').length;
-  const livingTeams = gameState.teams.filter(t => t.isAlive);
-  const deadTeams = gameState.teams.filter(t => !t.isAlive);
-  const pendingMurders = gameState.murderProposals.filter(p => p.status === 'pending');
+  const safeTeams = gameState.teams || [];
+  const traitorsCount = safeTeams.filter(t => t.role === 'traitor').length;
+  const loyalsCount = safeTeams.filter(t => t.role === 'loyal').length;
+  const livingTeams = safeTeams.filter(t => t.isAlive);
+  const deadTeams = safeTeams.filter(t => !t.isAlive);
+  const pendingMurders = (gameState.murderProposals || []).filter(p => p.status === 'pending');
   const hasPendingRecruitment = gameState.recruitment && gameState.recruitment.status === 'pending_admin';
 
   const handleRandomizeRoles = () => {
@@ -231,7 +227,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
 
   const handleStartVote = () => {
     socket.emit('admin:start_vote', {
-      title: voteTitle.trim() || `Rundbordssamling #${gameState.voteSession.roundNumber}`
+      title: voteTitle.trim() || `Rundbordssamling #${gameState.voteSession?.roundNumber || 1}`
     });
   };
 
@@ -241,26 +237,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
       manualEliminatedTeamId: manualEliminateId || undefined
     });
     setManualEliminateId('');
-  };
-
-  const handleStartPartnerSwap = () => {
-    socket.emit('admin:start_partner_swap', { durationSeconds: 150 });
-  };
-
-  const handleConfirmPartnerSwap = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!gameState.partnerSwap.winnerTeamId || !swapPlayerToReplace || !swapNewPlayerName) return;
-
-    socket.emit('admin:confirm_partner_swap', {
-      winningTeamId: gameState.partnerSwap.winnerTeamId,
-      playerToReplace: swapPlayerToReplace,
-      newPlayerName: swapNewPlayerName,
-      fromDeadTeamName: swapFromDeadTeam || 'Elimineret hold'
-    });
-
-    setSwapPlayerToReplace('');
-    setSwapNewPlayerName('');
-    setSwapFromDeadTeam('');
   };
 
   const handleStartMorningReveal = () => {
@@ -296,7 +272,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
               Værtspanel • Julius & Karoline
             </span>
             <h1 className="text-xl font-black font-gothic text-white">
-              Slottets Kontrolrum ({gameState.teams.length} Hold)
+              Slottets Kontrolrum ({safeTeams.length} Hold)
             </h1>
           </div>
         </div>
@@ -325,7 +301,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
         >
           <Gamepad2 className="w-4 h-4" />
           <span>Spilstyring</span>
-          {gameState.voteSession.isActive && <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />}
+          {gameState.voteSession?.isActive && <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />}
         </button>
 
         <button
@@ -401,7 +377,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
               >
                 <option value="auto">-- Automatisk (Seneste godkendte mord i nat) --</option>
                 <option value="none">🛡️ Ingen blev myrdet i nat (Skjold / Fredelig nat)</option>
-                {gameState.teams.map((t) => (
+                {safeTeams.map((t) => (
                   <option key={t.id} value={t.id}>
                     ☠️ {t.name} {!t.isAlive && '(Allerede markeret død)'}
                   </option>
@@ -436,12 +412,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
                 <Vote className="w-4 h-4 text-[#d4af37]" />
                 Digital Forvisning (Rundbordssamling)
               </h3>
-              <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase ${gameState.voteSession.isActive ? 'bg-red-950 text-red-300 border border-red-700 animate-pulse' : 'bg-black/50 text-gray-400'}`}>
-                {gameState.voteSession.isActive ? 'I Gang 🔴' : 'Afsluttet'}
+              <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase ${gameState.voteSession?.isActive ? 'bg-red-950 text-red-300 border border-red-700 animate-pulse' : 'bg-black/50 text-gray-400'}`}>
+                {gameState.voteSession?.isActive ? 'I Gang 🔴' : 'Afsluttet'}
               </span>
             </div>
 
-            {!gameState.voteSession.isActive ? (
+            {!gameState.voteSession?.isActive ? (
               <div className="space-y-3">
                 <div>
                   <label className="block text-[11px] text-[#c5bca8] mb-1">Rundens Navn:</label>
@@ -464,7 +440,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
               <div className="space-y-3">
                 <div className="p-3 rounded-2xl bg-[#380a10] border border-[#c41e3a] text-xs text-red-200 flex items-center justify-between">
                   <span>Deltagerne afgiver stemmer på det cirkulære rundbord.</span>
-                  <span className="font-black text-white">{Object.keys(gameState.voteSession.votes || {}).length} / {livingTeams.length} stemt</span>
+                  <span className="font-black text-white">{Object.keys(gameState.voteSession?.votes || {}).length} / {livingTeams.length} stemt</span>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs">
@@ -498,77 +474,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             )}
           </div>
 
-          {/* Partner Swap Controller */}
-          <div className="p-4 rounded-3xl border border-[#d4af37]/35 bg-[#16141e] space-y-3 shadow-xl">
-            <h3 className="text-xs font-black uppercase tracking-wider text-[#f6db7e] flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-[#d4af37]" />
-              Partnerbytte (Først-til-mølle)
-            </h3>
-
-            {!gameState.partnerSwap.isActive && !gameState.partnerSwap.winnerTeamId ? (
-              <button
-                onClick={handleStartPartnerSwap}
-                className="w-full py-3 rounded-2xl btn-gold text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer"
-              >
-                Udløs 2,5 Minutters Partnerbytte
-              </button>
-            ) : (
-              <div className="space-y-3">
-                {gameState.partnerSwap.winnerTeamId ? (
-                  <div className="p-4 rounded-2xl bg-[#2a2416] border border-[#d4af37] text-xs">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#f6db7e] block">
-                      Vinder: {gameState.partnerSwap.winnerTeamName}
-                    </span>
-
-                    <form onSubmit={handleConfirmPartnerSwap} className="mt-3 pt-2.5 border-t border-[#d4af37]/30 space-y-2.5">
-                      <div>
-                        <label className="block text-[11px] text-[#c5bca8] mb-1">Spiller der udskiftes:</label>
-                        <select
-                          value={swapPlayerToReplace}
-                          onChange={(e) => setSwapPlayerToReplace(e.target.value)}
-                          required
-                          className="w-full p-2.5 rounded-xl bg-black/50 border border-white/10 text-xs text-white"
-                        >
-                          <option value="">-- Vælg spiller --</option>
-                          {gameState.teams.find(t => t.id === gameState.partnerSwap.winnerTeamId)?.players.map((p, i) => (
-                            <option key={i} value={p}>{p}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-[#c5bca8] mb-1">Ny spiller (fra et dødt hold):</label>
-                        <input
-                          type="text"
-                          value={swapNewPlayerName}
-                          onChange={(e) => setSwapNewPlayerName(e.target.value)}
-                          placeholder="F.eks. Tobias Terney"
-                          required
-                          className="w-full p-2.5 rounded-xl bg-black/50 border border-white/10 text-xs text-white"
-                        />
-                      </div>
-
-                      <button type="submit" className="w-full py-2.5 rounded-xl btn-gold text-xs font-black uppercase tracking-wider">
-                        Bekræft Bytte
-                      </button>
-                    </form>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-2xl bg-yellow-950/60 border border-yellow-700/50 text-xs text-yellow-300">
-                    ⏳ Nedtælling i gang! Venter på første hold...
-                  </div>
-                )}
-
-                <button
-                  onClick={() => socket.emit('admin:reset_partner_swap')}
-                  className="w-full py-2 rounded-xl bg-black/40 border border-white/10 text-xs text-[#9e9585]"
-                >
-                  Nulstil Partnerbytte
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Quick Team Status List (Alive / Dead / Shield) */}
           <div className="p-4 rounded-3xl border border-white/10 bg-[#16141e] space-y-3">
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
@@ -587,7 +492,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {gameState.teams.map((team, idx) => (
+              {safeTeams.map((team, idx) => (
                 <div
                   key={team.id}
                   className={`p-3 rounded-2xl border flex items-center justify-between gap-2 ${
@@ -722,7 +627,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin">
-              {gameState.teams.map((team, idx) => {
+              {safeTeams.map((team, idx) => {
                 const isTraitor = team.role === 'traitor';
                 return (
                   <div
@@ -749,14 +654,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
           </div>
 
           {/* Murder Proposals Queue */}
-          {gameState.murderProposals.length > 0 && (
+          {pendingMurders.length > 0 && (
             <div className="p-4 rounded-3xl border border-[#c41e3a]/60 bg-[#1e0a0f] space-y-2.5 shadow-xl">
               <h3 className="text-xs font-black uppercase tracking-wider text-[#ff8095] flex items-center gap-2">
                 <Skull className="w-4 h-4 text-[#ff4d6d]" />
                 Indkomne Mord-anmodninger
               </h3>
 
-              {gameState.murderProposals.slice().reverse().map((prop) => (
+              {(gameState.murderProposals || []).slice().reverse().map((prop) => (
                 <div
                   key={prop.id}
                   className="p-3 rounded-2xl bg-black/50 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
@@ -804,7 +709,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ gameState, adminName }) 
             </div>
 
             <div className="h-[280px] overflow-y-auto space-y-2 p-3 rounded-2xl bg-black/60 border border-red-950/60 text-xs scrollbar-thin">
-              {gameState.traitorChat.map((msg) => (
+              {(gameState.traitorChat || []).map((msg) => (
                 <div key={msg.id} className={`flex flex-col ${msg.senderId === 'admin' ? 'items-end' : 'items-start'}`}>
                   <span className="text-[9px] text-[#9e9585] mb-0.5 px-1 font-semibold">{msg.senderName}</span>
                   <div className={`p-2.5 rounded-2xl max-w-[85%] leading-relaxed ${msg.senderId === 'admin' ? 'bg-[#d4af37] text-black font-bold' : msg.isSystem ? 'bg-[#380a10] text-[#fce8e8] italic' : 'bg-[#2a0e14] text-[#fce8e8] border border-white/5'}`}>

@@ -5,23 +5,23 @@ import { soundEngine } from '../soundEngine';
 import { Shield, Lock, Crown, Users, ChevronRight, Search, PlusCircle, UserCheck } from 'lucide-react';
 
 interface LoginScreenProps {
-  teams: Team[];
+  teams?: Team[];
   onLogin: (session: UserSession) => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ teams = [], onLogin }) => {
+  const safeTeams = Array.isArray(teams) ? teams : [];
   const [mode, setMode] = useState<'create' | 'choose' | 'admin'>('create');
   const [newTeamName, setNewTeamName] = useState<string>('');
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
-  const [selectedAdminId, setSelectedAdminId] = useState<string>(ADMIN_USERS[0].id);
+  const [selectedAdminId, setSelectedAdminId] = useState<string>(ADMIN_USERS[0]?.id || 'admin-julius');
   const [adminPin, setAdminPin] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const filteredTeams = teams.filter(t => 
-    t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.players.some(p => p.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredTeams = safeTeams.filter(t => 
+    (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.players || []).some(p => (p || '').toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // 1. Create and Register New Team Dynamically
@@ -78,7 +78,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
       return;
     }
 
-    const admin = ADMIN_USERS.find(a => a.id === selectedAdminId);
+    const admin = ADMIN_USERS.find(a => a.id === selectedAdminId) || ADMIN_USERS[0];
     if (!admin) return;
 
     soundEngine.playVictory();
@@ -132,7 +132,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
               <span>Nyt Hold</span>
             </button>
 
-            {teams.length > 0 && (
+            {safeTeams.length > 0 && (
               <button
                 type="button"
                 onClick={() => setMode('choose')}
@@ -143,7 +143,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
-                <span>Vælg ({teams.length})</span>
+                <span>Vælg ({safeTeams.length})</span>
               </button>
             )}
 
@@ -199,7 +199,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
                 <ChevronRight className="w-4 h-4" />
               </button>
 
-              {teams.length > 0 && (
+              {safeTeams.length > 0 && (
                 <div className="text-center pt-1">
                   <button
                     type="button"
@@ -224,7 +224,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
                   Vælg Dit Tilmeldte Hold
                 </label>
                 <span className="text-[10px] text-[#9e9585]">
-                  {teams.length} Tilmeldte
+                  {safeTeams.length} Tilmeldte
                 </span>
               </div>
 
@@ -241,7 +241,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
 
               <div className="max-h-[260px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
                 {filteredTeams.map((team, idx) => {
-                  const firstNames = team.players.map(p => p.trim().split(' ')[0]).join(' & ');
+                  const firstNames = (team.players || []).map(p => (p || '').trim().split(' ')[0]).join(' & ');
 
                   return (
                     <button
@@ -259,7 +259,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ teams, onLogin }) => {
                             {team.name}
                           </span>
                         </div>
-                        {team.players.length > 1 && (
+                        {(team.players || []).length > 1 && (
                           <span className="text-[10px] text-[#9e9585] block truncate mt-0.5 ml-7">
                             {firstNames}
                           </span>
